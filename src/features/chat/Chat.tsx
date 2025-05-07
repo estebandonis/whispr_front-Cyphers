@@ -1,11 +1,32 @@
 import { useParams } from "react-router";
 import { Input } from "@/components/ui/input";
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { hc } from 'hono/client'
 import CornerAccents from "@/components/corner-accents";
+
 export default function Chat() {
   const { id } = useParams();
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    console.log("Connecting to WebSocket...");
+    const client = hc('http://localhost:3000/message')
+    const ws = client.ws.$ws(0)
+
+    ws.addEventListener('open', () => {
+      console.log("WebSocket connection opened");
+    })
+    ws.addEventListener('join', () => {
+      console.log("Joined the chat");
+    })
+    ws.addEventListener('message', (event) => {
+      console.log("Received message: ", event.data)
+    })
+    ws.addEventListener('close', () => {
+      console.log("WebSocket connection closed");
+    });
+  }, []);
 
   // Dummy messages for display
   const messages = [
