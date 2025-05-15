@@ -32,7 +32,7 @@ export default function Chat() {
     const establishSecureSession = async () => {
       try {
         // Fetch recipient's public key bundle
-        const response = await fetch(`/api/user-keys/${id}`);
+        const response = await fetch(`http://localhost:3000/user/1/keybundle`);
         if (!response.ok) {
           throw new Error(
             `Failed to fetch recipient's keys: ${response.statusText}`
@@ -40,6 +40,7 @@ export default function Chat() {
         }
 
         const recipientPublicBundle = await response.json();
+        console.log("Recipient's key bundle:", recipientPublicBundle);
 
         // Initialize X3DH session with recipient
         const sessionData = await initializeX3DHSession(recipientPublicBundle);

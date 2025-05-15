@@ -74,35 +74,57 @@ export async function generateOPKs(count: number) {
 //
 export async function exportPublicKeys(
   ik_pub: CryptoKey,
+  ik_priv: CryptoKey,
   spk_pub: CryptoKey,
+  spk_priv: CryptoKey,
   spk_signature: string,
-  opks: { pub: CryptoKey }[]
+  opks: { pub: CryptoKey; priv: CryptoKey }[]
 ) {
-  const ikJwk = await exportJWK(ik_pub);
-  const spkJwk = await exportJWK(spk_pub);
+  // Export public and private keys to JWK format
+  const ikPublicJwk = await exportJWK(ik_pub);
+  const ikPrivateJwk = await exportJWK(ik_priv);
+  const spkPublicJwk = await exportJWK(spk_pub);
+  const spkPrivateJwk = await exportJWK(spk_priv);
 
-  // Format keys according to the provided schema
+  // Combine public and private components for each key to match the schema
+  const identityKey = {
+    kty: ikPublicJwk.kty,
+    crv: ikPublicJwk.crv,
+    x: ikPublicJwk.x,
+    y: ikPublicJwk.y,
+    d: ikPrivateJwk.d, // Private key component
+  };
+
+  const signedPrekey = {
+    kty: spkPublicJwk.kty,
+    crv: spkPublicJwk.crv,
+    x: spkPublicJwk.x,
+    y: spkPublicJwk.y,
+    d: spkPrivateJwk.d, // Private key component
+  };
+
+  // Export one-time pre-keys in the same format
+  const oneTimePreKeys = await Promise.all(
+    opks.map(async (k) => {
+      const pubJwk = await exportJWK(k.pub);
+      const privJwk = await exportJWK(k.priv);
+
+      return {
+        kty: pubJwk.kty,
+        crv: pubJwk.crv,
+        x: pubJwk.x,
+        y: pubJwk.y,
+        d: privJwk.d, // Private key component
+      };
+    })
+  );
+
+  // Format keys according to the schema
   return {
-    identityKey: {
-      keyId: crypto.randomUUID(),
-      publicKey: btoa(JSON.stringify(ikJwk)),
-      signature: "", // Self-signed, usually empty for identity key
-    },
-    signedPrekey: {
-      keyId: crypto.randomUUID(),
-      publicKey: btoa(JSON.stringify(spkJwk)),
-      signature: btoa(JSON.stringify(spkJwk)), // In a real implementation, this would be a signature
-    },
+    identityKey,
+    signedPrekey,
     prekeySignature: spk_signature,
-    oneTimeKeys: await Promise.all(
-      opks.map(async (k) => {
-        const jwk = await exportJWK(k.pub);
-        return {
-          keyId: crypto.randomUUID(),
-          publicKey: btoa(JSON.stringify(jwk)),
-        };
-      })
-    ),
+    oneTimePreKeys,
   };
 }
 
@@ -124,7 +146,9 @@ export async function initializeX3DH() {
   // Step 4: Export public data
   const publicBundle = await exportPublicKeys(
     ik_pub,
+    ik_priv,
     spk_pub,
+    spk_priv,
     spk_signature,
     opks
   );
@@ -145,7 +169,7 @@ export async function initializeX3DH() {
 }
 
 //
-// Secure storage implementation
+// Secure storage implementation - simplified to use only localStorage
 //
 export async function savePrivateKeys(keys: {
   ik_pub: CryptoKey;
@@ -154,171 +178,58 @@ export async function savePrivateKeys(keys: {
   spk_priv: CryptoKey;
   opks: { pub: CryptoKey; priv: CryptoKey }[];
 }) {
-  const exportedKeys = {
-    ik_pub: await exportJWK(keys.ik_pub),
-    ik_priv: await exportJWK(keys.ik_priv),
-    spk_pub: await exportJWK(keys.spk_pub),
-    spk_priv: await exportJWK(keys.spk_priv),
-    opks: await Promise.all(
-      keys.opks.map(async (k) => ({
-        pub: await exportJWK(k.pub),
-        priv: await exportJWK(k.priv),
-      }))
-    ),
-  };
+  try {
+    const exportedKeys = {
+      ik_pub: await exportJWK(keys.ik_pub),
+      ik_priv: await exportJWK(keys.ik_priv),
+      spk_pub: await exportJWK(keys.spk_pub),
+      spk_priv: await exportJWK(keys.spk_priv),
+      opks: await Promise.all(
+        keys.opks.map(async (k) => ({
+          pub: await exportJWK(k.pub),
+          priv: await exportJWK(k.priv),
+        }))
+      ),
+    };
 
-  // Store in IndexedDB for better security than localStorage
-  if (typeof window !== "undefined" && window.indexedDB) {
-    try {
-      return await storeKeysIndexedDB(exportedKeys);
-    } catch (err) {
-      console.error(
-        "Failed to save keys to IndexedDB, falling back to localStorage:",
-        err
-      );
-      localStorage.setItem("x3dh_keys", JSON.stringify(exportedKeys));
-    }
-  } else {
-    // Fallback to localStorage with warning
-    console.warn(
-      "IndexedDB not available, using less secure localStorage for keys"
-    );
+    // Store keys in localStorage only
     localStorage.setItem("x3dh_keys", JSON.stringify(exportedKeys));
+    console.log("Keys saved to localStorage successfully");
+  } catch (error) {
+    console.error("Failed to save keys:", error);
+    throw error;
   }
-}
-
-// Helper for IndexedDB storage
-async function storeKeysIndexedDB(keys: any): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open("whisprSecureKeys", 1);
-
-    request.onupgradeneeded = (event) => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains("keys")) {
-        db.createObjectStore("keys", { keyPath: "id" });
-      }
-    };
-
-    request.onsuccess = () => {
-      const db = request.result;
-      const tx = db.transaction("keys", "readwrite");
-      const store = tx.objectStore("keys");
-
-      store.put({
-        id: "x3dh_keys",
-        data: keys,
-        timestamp: Date.now(),
-      });
-
-      tx.oncomplete = () => {
-        db.close();
-        resolve();
-      };
-
-      tx.onerror = () => {
-        reject(tx.error);
-      };
-    };
-
-    request.onerror = () => {
-      reject(request.error);
-    };
-  });
 }
 
 /**
- * Retrieve stored private keys from secure storage
+ * Retrieve stored private keys from localStorage
  */
 export async function getPrivateKeys() {
-  // Try IndexedDB first
-  if (typeof window !== "undefined" && window.indexedDB) {
-    try {
-      const keys = await getKeysFromIndexedDB();
-      if (keys) return keys;
-    } catch (err) {
-      console.error(
-        "Failed to get keys from IndexedDB, checking localStorage:",
-        err
-      );
-    }
-  }
-
-  // Fall back to localStorage
+  // Get keys from localStorage
   const keysStr = localStorage.getItem("x3dh_keys");
   if (!keysStr) {
     throw new Error("No keys found in storage");
   }
 
-  const exportedKeys = JSON.parse(keysStr);
+  try {
+    const exportedKeys = JSON.parse(keysStr);
 
-  return {
-    ik_pub: await importJWK(exportedKeys.ik_pub, "ES256"),
-    ik_priv: await importJWK(exportedKeys.ik_priv, "ES256"),
-    spk_pub: await importJWK(exportedKeys.spk_pub, "ECDH-ES"),
-    spk_priv: await importJWK(exportedKeys.spk_priv, "ECDH-ES"),
-    opks: await Promise.all(
-      exportedKeys.opks.map(async (k: any) => ({
-        pub: await importJWK(k.pub, "ECDH-ES"),
-        priv: await importJWK(k.priv, "ECDH-ES"),
-      }))
-    ),
-  };
-}
-
-/**
- * Retrieve stored keys from IndexedDB
- */
-async function getKeysFromIndexedDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open("whisprSecureKeys", 1);
-
-    request.onsuccess = async () => {
-      const db = request.result;
-      const tx = db.transaction("keys", "readonly");
-      const store = tx.objectStore("keys");
-
-      const getRequest = store.get("x3dh_keys");
-
-      getRequest.onsuccess = async () => {
-        if (!getRequest.result) {
-          resolve(null);
-          return;
-        }
-
-        const exportedKeys = getRequest.result.data;
-
-        try {
-          const keys = {
-            ik_pub: await importJWK(exportedKeys.ik_pub, "ES256"),
-            ik_priv: await importJWK(exportedKeys.ik_priv, "ES256"),
-            spk_pub: await importJWK(exportedKeys.spk_pub, "ECDH-ES"),
-            spk_priv: await importJWK(exportedKeys.spk_priv, "ECDH-ES"),
-            opks: await Promise.all(
-              exportedKeys.opks.map(async (k: any) => ({
-                pub: await importJWK(k.pub, "ECDH-ES"),
-                priv: await importJWK(k.priv, "ECDH-ES"),
-              }))
-            ),
-          };
-
-          resolve(keys);
-        } catch (err: unknown) {
-          reject(err instanceof Error ? err : new Error(String(err)));
-        }
-
-        db.close();
-      };
-
-      getRequest.onerror = () => {
-        reject(getRequest.error);
-        db.close();
-      };
+    return {
+      ik_pub: await importJWK(exportedKeys.ik_pub, "ES256"),
+      ik_priv: await importJWK(exportedKeys.ik_priv, "ES256"),
+      spk_pub: await importJWK(exportedKeys.spk_pub, "ECDH-ES"),
+      spk_priv: await importJWK(exportedKeys.spk_priv, "ECDH-ES"),
+      opks: await Promise.all(
+        exportedKeys.opks.map(async (k: any) => ({
+          pub: await importJWK(k.pub, "ECDH-ES"),
+          priv: await importJWK(k.priv, "ECDH-ES"),
+        }))
+      ),
     };
-
-    request.onerror = () => {
-      reject(request.error);
-    };
-  });
+  } catch (error) {
+    console.error("Error importing keys:", error);
+    throw error;
+  }
 }
 
 /**
@@ -330,22 +241,46 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
   // Get our private keys
   const myKeys = await getPrivateKeys();
 
+  // The identityKey and signedPrekey are directly JWK objects in the schema format
+  const ikJwk = {
+    kty: recipientPublicBundle.identityKey.kty,
+    crv: recipientPublicBundle.identityKey.crv,
+    x: recipientPublicBundle.identityKey.x,
+    y: recipientPublicBundle.identityKey.y,
+    // d is private key component, not needed for recipient's public key
+  };
+
+  const spkJwk = {
+    kty: recipientPublicBundle.signedPrekey.kty,
+    crv: recipientPublicBundle.signedPrekey.crv,
+    x: recipientPublicBundle.signedPrekey.x,
+    y: recipientPublicBundle.signedPrekey.y,
+    // d is private key component, not needed for recipient's public key
+  };
+
   // Import recipient public keys
-  const recipientIK = await importJWK(recipientPublicBundle.ik, "ES256");
-  const recipientSPK = await importJWK(recipientPublicBundle.spk, "ECDH-ES");
+  const recipientIK = await importJWK(ikJwk, "ES256");
+  const recipientSPK = await importJWK(spkJwk, "ECDH-ES");
 
   // Verify the SPK signature
   try {
     const { payload } = await jwtVerify(
-      recipientPublicBundle.spk_sig,
+      recipientPublicBundle.prekeySignature,
       recipientIK
     );
 
     // Confirm the SPK in the signature matches the provided SPK
     const signedSPK = (payload as any).spk;
-    const providedSPK = recipientPublicBundle.spk;
 
-    if (JSON.stringify(signedSPK) !== JSON.stringify(providedSPK)) {
+    // Compare only the essential parts of the SPK JWK
+    const providedSPKEssential = {
+      kty: spkJwk.kty,
+      crv: spkJwk.crv,
+      x: spkJwk.x,
+      y: spkJwk.y,
+    };
+
+    if (JSON.stringify(signedSPK) !== JSON.stringify(providedSPKEssential)) {
       throw new Error("SPK signature verification failed: SPK mismatch");
     }
   } catch (err: unknown) {
@@ -364,9 +299,21 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
 
   // Choose a one-time pre-key if available
   let recipientOPK = null;
-  if (recipientPublicBundle.opks && recipientPublicBundle.opks.length > 0) {
-    // For simplicity, just use the first one
-    recipientOPK = await importJWK(recipientPublicBundle.opks[0], "ECDH-ES");
+  if (
+    recipientPublicBundle.oneTimePreKeys &&
+    recipientPublicBundle.oneTimePreKeys.length > 0
+  ) {
+    // Get the first one-time pre-key
+    const opkJwk = {
+      kty: recipientPublicBundle.oneTimePreKeys[0].kty,
+      crv: recipientPublicBundle.oneTimePreKeys[0].crv,
+      x: recipientPublicBundle.oneTimePreKeys[0].x,
+      y: recipientPublicBundle.oneTimePreKeys[0].y,
+      // d is private key component, not needed for recipient's public key
+    };
+
+    // Import the OPK
+    recipientOPK = await importJWK(opkJwk, "ECDH-ES");
   }
 
   // Compute the shared secrets using ECDH

@@ -8,7 +8,7 @@ export default function MainLayout() {
   useEffect(() => {
     const initializeCrypto = async () => {
       try {
-        // Check if keys already exist
+        // Check if keys already exist in localStorage only
         const hasKeys = localStorage.getItem("x3dh_keys") !== null;
 
         if (!hasKeys && !isInitializing) {
@@ -19,12 +19,15 @@ export default function MainLayout() {
 
           console.log("Public bundle:", publicBundle);
 
-          // Send public keys to server in the required format
-          const response = await fetch("http://localhost:3000/user/keybundle", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(publicBundle),
-          });
+          // Send key bundle to server
+          const response = await fetch(
+            "http://localhost:3000/user/1/keybundle",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(publicBundle),
+            }
+          );
 
           if (response.ok) {
             console.log("Keys registered with the server successfully");
@@ -36,6 +39,8 @@ export default function MainLayout() {
           }
 
           setIsInitializing(false);
+        } else {
+          console.log("Keys already exist, skipping initialization");
         }
       } catch (error) {
         console.error("Failed to initialize or register keys:", error);
@@ -44,7 +49,7 @@ export default function MainLayout() {
     };
 
     initializeCrypto();
-  }, []);
+  }, [isInitializing]);
 
   return (
     <div className="bg-neutral-950 h-screen w-full text-white font-body">
