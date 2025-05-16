@@ -1,12 +1,11 @@
-import { Outlet } from "react-router";
-import { useEffect, useState } from "react";
 import { initializeX3DH } from "@/lib/crypto";
-
+import { useEffect } from "react";
+import { Outlet } from "react-router";
+// import { api } from "@/lib/api";
 export default function MainLayout() {
   useEffect(() => {
-    const initializeCrypto = async () => {
+    const initializeKeys = async () => {
       try {
-        // Check if keys already exist in localStorage only
         const hasKeys = localStorage.getItem("x3dh_keys") !== null;
 
         if (!hasKeys) {
@@ -37,7 +36,7 @@ export default function MainLayout() {
       }
     };
 
-    initializeCrypto();
+    initializeKeys();
   }, []);
 
   return (

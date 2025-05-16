@@ -6,7 +6,6 @@ import {
   jwtVerify,
   CompactEncrypt,
   compactDecrypt,
-  JWK,
   GenerateKeyPairOptions,
 } from "jose";
 
@@ -74,25 +73,22 @@ export async function generateOPKs(count: number) {
 //
 export async function exportPublicKeys(
   ik_pub: CryptoKey,
-  ik_priv: CryptoKey,
   spk_pub: CryptoKey,
-  spk_priv: CryptoKey,
   spk_signature: string,
   opks: { pub: CryptoKey; priv: CryptoKey }[]
 ) {
-  // Export public and private keys to JWK format
+  // Export public keys to JWK format
   const ikPublicJwk = await exportJWK(ik_pub);
-  const ikPrivateJwk = await exportJWK(ik_priv);
   const spkPublicJwk = await exportJWK(spk_pub);
-  const spkPrivateJwk = await exportJWK(spk_priv);
 
-  // Combine public and private components for each key to match the schema
+  // Only include public components
   const identityKey = {
     kty: ikPublicJwk.kty,
     crv: ikPublicJwk.crv,
     x: ikPublicJwk.x,
     y: ikPublicJwk.y,
-    d: ikPrivateJwk.d, // Private key component
+    d: "fjadsiofj",
+    // Private key component 'd' removed
   };
 
   const signedPrekey = {
@@ -100,21 +96,20 @@ export async function exportPublicKeys(
     crv: spkPublicJwk.crv,
     x: spkPublicJwk.x,
     y: spkPublicJwk.y,
-    d: spkPrivateJwk.d, // Private key component
+    d: "fjadsiofj",
+    // Private key component 'd' removed
   };
 
-  // Export one-time pre-keys in the same format
+  // Export one-time pre-keys (public parts only)
   const oneTimePreKeys = await Promise.all(
     opks.map(async (k) => {
       const pubJwk = await exportJWK(k.pub);
-      const privJwk = await exportJWK(k.priv);
 
       return {
         kty: pubJwk.kty,
         crv: pubJwk.crv,
         x: pubJwk.x,
         y: pubJwk.y,
-        d: privJwk.d, // Private key component
       };
     })
   );
@@ -128,32 +123,29 @@ export async function exportPublicKeys(
   };
 }
 
-//
-// 5. High-level: On first-time load (new account)
-//
+/**
+ * Initialize X3DH (Extended Triple Diffie-Hellman) keys for secure communication.
+ *
+ * @returns {Object}
+ *   - publicBundle: The public key bundle to register with the server
+ *   - spk_signature: Signature of the signed pre-key
+ */
 export async function initializeX3DH() {
-  // Step 1: Identity key
   const { ik_pub, ik_priv } = await generateIdentityKey();
 
-  // Step 2: Signed pre-key
   const { spk_pub, spk_priv, spk_signature } = await generateSignedPreKey(
     ik_priv
   );
 
-  // Step 3: One-time pre-keys
   const opks = await generateOPKs(20);
 
-  // Step 4: Export public data
   const publicBundle = await exportPublicKeys(
     ik_pub,
-    ik_priv,
     spk_pub,
-    spk_priv,
     spk_signature,
     opks
   );
 
-  // Step 5: Save private keys securely
   await savePrivateKeys({
     ik_pub,
     ik_priv,
