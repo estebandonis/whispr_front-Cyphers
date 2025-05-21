@@ -7,20 +7,37 @@ import LoginPage from "./features/auth/login.tsx";
 import SignUpPage from "./features/auth/sign-up.tsx";
 import ChatLayout from "./layouts/chat-layout.tsx";
 import Chat from "./features/chat/Chat.tsx";
+import OAuth from "./features/auth/oauth.tsx";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/sonner";
+import ProtectedRoute from "./layouts/protected-route.tsx";
+
+const queryClient = new QueryClient();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<MainLayout />}>
-          <Route path="/" element={<LoginPage />} />
-          <Route path="/sign-up" element={<SignUpPage />} />
-          <Route path="/chat" element={<ChatLayout />}>
-            <Route path="/chat/:id" element={<Chat />} />
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<MainLayout />}>
+            <Route path="/" element={<LoginPage />} />
+            <Route path="/sign-up" element={<SignUpPage />} />
+            <Route path="/oauth-callback" element={<OAuth />} />
+            <Route
+              path="/chat"
+              element={
+                <ProtectedRoute>
+                  <ChatLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/chat/:id" element={<Chat />} />
+            </Route>
           </Route>
-        </Route>
-        <Route path="*" element={<h1>Not Found</h1>} />
-      </Routes>
-    </BrowserRouter>
+          <Route path="*" element={<h1>Not Found</h1>} />
+        </Routes>
+        <Toaster />
+      </BrowserRouter>
+    </QueryClientProvider>
   </StrictMode>
 );

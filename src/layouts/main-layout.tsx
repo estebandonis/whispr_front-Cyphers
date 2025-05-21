@@ -1,7 +1,7 @@
 import { initializeX3DH } from "@/lib/crypto";
 import { useEffect } from "react";
 import { Outlet } from "react-router";
-// import { api } from "@/lib/api";
+
 export default function MainLayout() {
   useEffect(() => {
     const initializeKeys = async () => {

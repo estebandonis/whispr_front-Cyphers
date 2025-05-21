@@ -1,7 +1,8 @@
 import CornerAccents from "@/components/corner-accents";
-import { SettingsIcon } from "lucide-react";
+import { SettingsIcon, LogOut } from "lucide-react";
 import { Outlet, NavLink } from "react-router";
-import { cn } from "@/lib/utils";
+import { cn, logout } from "@/lib/utils";
+
 export default function ChatLayout() {
   let users = [
     {
@@ -197,6 +198,13 @@ export default function ChatLayout() {
             </div>
             <button className="p-2 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded">
               <SettingsIcon className="size-4" />
+            </button>
+            <button
+              onClick={logout}
+              type="button"
+              className="p-2 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded cursor-pointer"
+            >
+              <LogOut className="size-4" />
             </button>
           </div>
         </div>
