@@ -31,7 +31,7 @@ export default function OAuth() {
         navigate("/chat");
       },
       onError: (error) => {
-        console.log("error:", error);
+        // console.log("error:", error);
         let errorMessage =
           "An unexpected error occurred during GitHub authentication.";
         if (

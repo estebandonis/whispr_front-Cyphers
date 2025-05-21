@@ -8,7 +8,7 @@ import api from "@/lib/api";
 const login = async (email: string, password: string): Promise<string> => {
   const {
     data: { token },
-  } = await api.post("/auth/login", { email, password });
+  } = await api.post("/auth/login", { username: email, password });
   return token;
 };
 
@@ -54,7 +54,6 @@ const validateJwtToken = async (token?: string): Promise<boolean> => {
       token,
     },
   });
-  console.log("valid jwt token:", valid);
   return valid;
 };
 
@@ -74,7 +73,6 @@ const validateGithubToken = async (token?: string): Promise<boolean> => {
       token,
     },
   });
-  console.log("valid github token:", valid);
   return valid;
 };
 

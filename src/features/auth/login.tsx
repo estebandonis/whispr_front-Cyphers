@@ -60,12 +60,14 @@ export default function LoginPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={loggingIn}
+          type="email"
         />
         <Input
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           disabled={loggingIn}
+          type="password"
         />
         <Button
           asChild
