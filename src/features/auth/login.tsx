@@ -3,15 +3,42 @@ import { Button } from "@/components/ui/button";
 import { NavLink, useNavigate } from "react-router";
 import CornerAccents from "@/components/corner-accents";
 import { Github } from "lucide-react";
-import { useLogin } from "./queries";
+import {
+  useLogin,
+  useValidateGithubToken,
+  useValidateJwtToken,
+} from "./queries";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  const [jwtToken, setJwtToken] = useState<string | undefined>(undefined);
+  const [githubToken, setGithubToken] = useState<string | undefined>(undefined);
+
+  // Effect to load tokens from localStorage once
+  useEffect(() => {
+    const storedJwtToken = localStorage.getItem("jwt-token") || undefined;
+    const storedGithubToken =
+      localStorage.getItem("github-oauth-token") || undefined;
+    setJwtToken(storedJwtToken);
+    setGithubToken(storedGithubToken);
+  }, []);
+
+  const { data: jwtTokenValid } = useValidateJwtToken(jwtToken);
+  const { data: githubTokenValid } = useValidateGithubToken(githubToken);
+
+  useEffect(() => {
+    if (jwtTokenValid) {
+      navigate("/chat");
+    } else if (githubTokenValid) {
+      navigate("/chat");
+    }
+  }, [jwtTokenValid, githubTokenValid]);
 
   const { mutate: login, isPending: loggingIn } = useLogin();
   const navigate = useNavigate();
