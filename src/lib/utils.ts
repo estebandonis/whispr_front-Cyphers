@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const logout = () => {
-  localStorage.setItem("jwt-token", "");
-  localStorage.setItem("github-oauth-token", "");
+  localStorage.removeItem("jwt-token");
+  localStorage.removeItem("github-oauth-token");
   window.location.href = "/";
 };
