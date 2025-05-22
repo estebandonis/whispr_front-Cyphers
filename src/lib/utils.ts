@@ -11,3 +11,10 @@ export const logout = () => {
   localStorage.removeItem("access_token");
   window.location.href = "/";
 };
+
+// Get the current user ID for use in conversations
+export function getCurrentUserId(): string {
+  // This should be replaced with your actual user authentication logic
+  // For now, return a hardcoded value or get from localStorage if stored during login
+  return localStorage.getItem("currentUserId") || "1";
+}
