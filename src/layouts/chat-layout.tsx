@@ -2,55 +2,10 @@ import CornerAccents from "@/components/corner-accents";
 import { SettingsIcon, LogOut } from "lucide-react";
 import { Outlet, NavLink } from "react-router";
 import { cn, logout } from "@/lib/utils";
+import { useListUsers } from "@/features/chat/queries";
 
 export default function ChatLayout() {
-  let users = [
-    {
-      id: 1,
-      name: "John Doe",
-      lastMessage: "Hello, how are you?",
-      avatar: "/avatars/john.jpg",
-      time: "2:30 PM",
-      unread: 3,
-      status: "online",
-    },
-    {
-      id: 2,
-      name: "Emily Johnson",
-      lastMessage: "Can you send me those files?",
-      avatar: "/avatars/emily.jpg",
-      time: "1:15 PM",
-      unread: 0,
-      status: "online",
-    },
-    {
-      id: 3,
-      name: "Alex Martin",
-      lastMessage: "Meeting at 3pm tomorrow",
-      avatar: "/avatars/alex.jpg",
-      time: "Yesterday",
-      unread: 0,
-      status: "offline",
-    },
-    {
-      id: 4,
-      name: "Sarah Williams",
-      lastMessage: "Thanks for your help!",
-      avatar: "/avatars/sarah.jpg",
-      time: "Yesterday",
-      unread: 1,
-      status: "online",
-    },
-    {
-      id: 5,
-      name: "Michael Chen",
-      lastMessage: "Let's discuss the project later",
-      avatar: "/avatars/michael.jpg",
-      time: "Monday",
-      unread: 0,
-      status: "away",
-    },
-  ];
+  const { data: users } = useListUsers();
 
   let groupChats = [
     {
@@ -105,10 +60,10 @@ export default function ChatLayout() {
           {/* Users */}
           <div>
             <h2 className="text-xs uppercase font-medium text-neutral-500 mb-3">
-              Direct Messages
+              {users?.length} Users
             </h2>
             <div className="flex flex-col ">
-              {users.map((user) => (
+              {users?.map((user: any) => (
                 <NavLink
                   key={user.id}
                   to={`/chat/${user.id}`}
@@ -137,7 +92,7 @@ export default function ChatLayout() {
                         </div>
                         <div className="flex justify-between items-center">
                           <p className="text-xs text-neutral-400 truncate">
-                            {user.lastMessage}
+                            {user.username}
                           </p>
                         </div>
                       </div>

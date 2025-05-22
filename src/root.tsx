@@ -6,7 +6,7 @@ import MainLayout from "./layouts/main-layout.tsx";
 import LoginPage from "./features/auth/login.tsx";
 import SignUpPage from "./features/auth/sign-up.tsx";
 import ChatLayout from "./layouts/chat-layout.tsx";
-import Chat from "./features/chat/Chat.tsx";
+import Chat from "./features/chat/index.tsx";
 import OAuth from "./features/auth/oauth.tsx";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
