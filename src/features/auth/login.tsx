@@ -20,8 +20,9 @@ export default function LoginPage() {
     login(
       { username, password },
       {
-        onSuccess: (access_token) => {
+        onSuccess: ({ access_token, refresh_token }) => {
           localStorage.setItem("access_token", access_token);
+          localStorage.setItem("refresh_token", refresh_token);
           toast.success("Logged in");
           navigate("/chat");
         },

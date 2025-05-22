@@ -5,11 +5,14 @@ import {
 } from "@tanstack/react-query";
 import api from "@/lib/api";
 
-const login = async (username: string, password: string): Promise<string> => {
+const login = async (
+  username: string,
+  password: string
+): Promise<{ access_token: string; refresh_token: string }> => {
   const {
-    data: { access_token },
+    data: { access_token, refresh_token },
   } = await api.post("/auth/login", { username, password });
-  return access_token;
+  return { access_token, refresh_token };
 };
 
 export const useLogin = () => {
@@ -24,11 +27,13 @@ export const useLogin = () => {
   });
 };
 
-const loginWithGithubOAuth = async (code: string): Promise<string> => {
+const loginWithGithubOAuth = async (
+  code: string
+): Promise<{ access_token: string; refresh_token: string }> => {
   const {
-    data: { access_token },
+    data: { access_token, refresh_token },
   } = await api.post("/auth/oauth/github", { code });
-  return access_token;
+  return { access_token, refresh_token };
 };
 
 export const useGithubOAuthLogin = () => {
