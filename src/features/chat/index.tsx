@@ -184,7 +184,7 @@ export default function Chat() {
 
       // 5. Parse the decrypted message
       const keyMessage = JSON.parse(new TextDecoder().decode(decrypted));
-      const { convSignPub } = keyMessage;
+      const { convSignPub, convSignPriv, convSymKey, initiatorId } = keyMessage;
 
       // 6. Generate our own signing key pair for this conversation
       const mySignKeyPair = await window.crypto.subtle.generateKey(
@@ -193,13 +193,29 @@ export default function Chat() {
         ["sign", "verify"]
       );
 
-      // 7. Get the symmetric key from the initiator
-      // In a full implementation, this would be included in the keyMessage
-      // For simplicity, we'll generate our own for now, but in real system it should match
-      const convSymKey = await window.crypto.subtle.generateKey(
+      // 7. Import the symmetric key from the initiator
+      const importedSymKey = await window.crypto.subtle.importKey(
+        "raw",
+        new Uint8Array(convSymKey),
         { name: "AES-GCM", length: 256 },
         true,
         ["encrypt", "decrypt"]
+      );
+
+      const importedSignPubKey = await window.crypto.subtle.importKey(
+        "jwk",
+        convSignPub,
+        { name: "ECDSA", namedCurve: "P-256" },
+        true,
+        ["verify"]  // Public key can only be used for verification
+      );
+      
+      const importedSignPrivKey = await window.crypto.subtle.importKey(
+        "jwk",
+        convSignPriv,
+        { name: "ECDSA", namedCurve: "P-256" },
+        true,
+        ["sign"]  // Public key can only be used for verification
       );
 
       // 8. Export our public signing key to send back
@@ -217,9 +233,12 @@ export default function Chat() {
       // 10. Save the conversation keys locally
       const convId = await saveConversationKeys(
         pendingConvo.initiatorId.toString(),
-        convSymKey,
-        mySignKeyPair,
-        convSignPub, // Store initiator's signing key
+        importedSymKey,
+        {
+          privateKey: importedSignPrivKey,
+          publicKey: importedSignPubKey,
+        },
+        pendingConvo.initiatorIdentityKey, // Store initiator's signing key
         false // We're not the initiator
       );
 
