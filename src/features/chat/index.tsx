@@ -275,9 +275,21 @@ export default function Chat() {
         convSignKeyPair.publicKey
       );
 
+      const exportedSignPriv = await window.crypto.subtle.exportKey(
+        "jwk",
+        convSignKeyPair.privateKey
+      );
+
+      const exportedSymKey = await window.crypto.subtle.exportKey(
+        "raw",
+        convSymKey
+      );
+
       // Step 4: Prepare initial key message
       const keyMessage = {
         convSignPub: exportedSignPub,
+        convSignPriv: exportedSignPriv,
+        convSymKey: exportedSymKey,
         initiatorId: getCurrentUserId(), // Get the current user's ID
       };
 
