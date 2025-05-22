@@ -1,5 +1,6 @@
 import api from "@/lib/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { getCurrentUserId } from "@/lib/utils";
 
 interface User {
   id: number;
@@ -103,5 +104,39 @@ export const useGetConversationMessages = (conversationId: string) => {
       return data;
     },
     enabled: !!conversationId,
+  });
+};
+
+// Fetch pending conversations where the user is the recipient
+export const useGetPendingConversations = (options?: { enabled?: boolean }) => {
+  return useQuery({
+    queryKey: ["pendingConversations"],
+    queryFn: async () => {
+      const { data } = await api.get(`/conversations/pending`);
+      return data;
+    },
+    enabled: options?.enabled !== undefined ? options.enabled : true,
+  });
+};
+
+// Accept a conversation and send back signing public key
+export const useAcceptConversation = () => {
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      signingPublicKey,
+    }: {
+      conversationId: string | number;
+      signingPublicKey: any; // JWK format
+    }) => {
+      const { data } = await api.post(
+        `/conversations/${conversationId}/accept`,
+        {
+          signingPublicKey,
+          responderId: getCurrentUserId(),
+        }
+      );
+      return data;
+    },
   });
 };

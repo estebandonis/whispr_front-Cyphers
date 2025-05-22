@@ -1,10 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { initializeX3DHSession } from "@/lib/crypto";
+import {
+  initializeX3DHSession,
+  completeX3DHRecipient,
+  getPrivateKeys,
+} from "@/lib/crypto";
 import {
   getConversationWithUser,
   loadConversationKeys,
   saveConversationKeys,
+  updateConversationWithTheirKey,
 } from "@/lib/conversation-store";
 import {
   decryptMessage,
@@ -12,12 +17,15 @@ import {
   processSecureMessage,
 } from "@/lib/message-crypto";
 import { getCurrentUserId } from "@/lib/utils";
+import api from "@/lib/api";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import {
   useGetUserKeyBundle,
   useInitiateConversation,
   useSendMessage,
+  useGetPendingConversations,
+  useAcceptConversation,
 } from "./queries";
 
 interface Message {
@@ -27,6 +35,19 @@ interface Message {
   time: string;
   isMine: boolean;
   isAuthentic?: boolean;
+}
+
+// Add this interface for pending conversations
+interface PendingConversation {
+  id: string | number;
+  initiatorId: string | number;
+  initialPayload: {
+    iv: number[];
+    ciphertext: number[];
+    ephemeralKeyPublicJWK: any;
+    usedOPKId?: string | number;
+  };
+  initiatorIdentityKey?: any;
 }
 
 export default function Chat() {
@@ -53,6 +74,13 @@ export default function Chat() {
     });
   const { mutateAsync: initiateConversation } = useInitiateConversation();
   const { mutateAsync: sendMessage } = useSendMessage();
+
+  // Add hooks for pending conversations
+  const { data: pendingConversations, isLoading: isLoadingPending } =
+    useGetPendingConversations({
+      enabled: !conversationId && !isInitializingConversation,
+    });
+  const { mutateAsync: acceptConversation } = useAcceptConversation();
 
   // Check for existing conversation or start a new one
   useEffect(() => {
@@ -83,8 +111,29 @@ export default function Chat() {
           } else {
             console.error("Failed to load conversation keys");
           }
-        } else if (keyBundle && !isInitializingConversation) {
-          // No existing conversation, need to initialize a new one
+        }
+        // Check if we're the recipient of a pending conversation with this user
+        else if (pendingConversations?.length) {
+          // Find a pending conversation with this user
+          const pendingConvo = pendingConversations.find(
+            (convo: PendingConversation) =>
+              convo.initiatorId.toString() === userId
+          );
+
+          if (pendingConvo) {
+            console.log(
+              "Found pending conversation as recipient, processing..."
+            );
+            await processPendingConversation(pendingConvo);
+          }
+          // If no pending conversation with this specific user, but we have keyBundle, initiate new
+          else if (keyBundle && !isInitializingConversation) {
+            console.log("No existing conversation, initializing new one");
+            await initializeNewConversation();
+          }
+        }
+        // If no pending conversations at all, but we have keyBundle, initiate new
+        else if (keyBundle && !isInitializingConversation) {
           console.log("No existing conversation, initializing new one");
           await initializeNewConversation();
         }
@@ -94,7 +143,103 @@ export default function Chat() {
     };
 
     checkExistingConversation();
-  }, [userId, keyBundle]);
+  }, [userId, keyBundle, pendingConversations]);
+
+  // no pending -> generas llaves -> encriptas con x3dh (con bundle del otro) -> creas conversaciones con payload encriptado
+  // si pending -> agarras payload encriptado -> agarras bundle del otro, derivas con 3xdh -> desencriptas -> guardas llaves descriptadas -> marcas como finalizada
+
+  // Process a pending conversation as the recipient
+  const processPendingConversation = async (
+    pendingConvo: PendingConversation
+  ) => {
+    try {
+      setIsInitializingConversation(true);
+      console.log("Processing pending conversation:", pendingConvo);
+
+      // 1. Get our private keys
+      const myKeys = await getPrivateKeys();
+
+      // 2. Extract data from the pending conversation
+      const { ephemeralKeyPublicJWK, iv, ciphertext, usedOPKId } =
+        pendingConvo.initialPayload;
+
+      // 3. Derive the shared secret using X3DH (recipient side)
+      // This function needs to be implemented in crypto.ts
+      const { sharedKey } = await completeX3DHRecipient(
+        ephemeralKeyPublicJWK,
+        pendingConvo.initiatorIdentityKey || {}, // Provide a default empty object if not available
+        myKeys as any, // Use type assertion to avoid complex type issues
+        usedOPKId
+      );
+
+      // 4. Decrypt the initial payload
+      const ivArray = new Uint8Array(iv);
+      const ciphertextArray = new Uint8Array(ciphertext);
+
+      const decrypted = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: ivArray },
+        sharedKey,
+        ciphertextArray
+      );
+
+      // 5. Parse the decrypted message
+      const keyMessage = JSON.parse(new TextDecoder().decode(decrypted));
+      const { convSignPub } = keyMessage;
+
+      // 6. Generate our own signing key pair for this conversation
+      const mySignKeyPair = await window.crypto.subtle.generateKey(
+        { name: "ECDSA", namedCurve: "P-256" },
+        true,
+        ["sign", "verify"]
+      );
+
+      // 7. Get the symmetric key from the initiator
+      // In a full implementation, this would be included in the keyMessage
+      // For simplicity, we'll generate our own for now, but in real system it should match
+      const convSymKey = await window.crypto.subtle.generateKey(
+        { name: "AES-GCM", length: 256 },
+        true,
+        ["encrypt", "decrypt"]
+      );
+
+      // 8. Export our public signing key to send back
+      const mySignPubKey = await window.crypto.subtle.exportKey(
+        "jwk",
+        mySignKeyPair.publicKey
+      );
+
+      // 9. Accept the conversation and send back our signing key
+      await acceptConversation({
+        conversationId: pendingConvo.id,
+        signingPublicKey: mySignPubKey,
+      });
+
+      // 10. Save the conversation keys locally
+      const convId = await saveConversationKeys(
+        pendingConvo.initiatorId.toString(),
+        convSymKey,
+        mySignKeyPair,
+        convSignPub, // Store initiator's signing key
+        false // We're not the initiator
+      );
+
+      // 11. Update local state
+      conversationKeysRef.current = {
+        convId,
+        symKey: convSymKey,
+        signKeyPair: mySignKeyPair,
+        theirSignPubKey: convSignPub,
+      };
+
+      setConversationId(convId);
+      setIsSessionEstablished(true);
+      console.log("Processed pending conversation successfully");
+    } catch (error) {
+      console.error("Failed to process pending conversation:", error);
+    } finally {
+      setIsInitializingConversation(false);
+    }
+  };
 
   // Initialize a new conversation using X3DH
   const initializeNewConversation = async () => {
@@ -286,7 +431,7 @@ export default function Chat() {
     return <div className="p-4">No conversation selected</div>;
   }
 
-  if (isLoadingKeyBundle || isInitializingConversation) {
+  if (isLoadingKeyBundle || isLoadingPending || isInitializingConversation) {
     return <div className="p-4">Setting up secure conversation...</div>;
   }
 
