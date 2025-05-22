@@ -25,8 +25,8 @@ export default function OAuth() {
   const handleOAuth = async (code: string) => {
     setLoading(false);
     loginWithGithubOAuth(code, {
-      onSuccess: (token) => {
-        localStorage.setItem("github-oauth-token", token);
+      onSuccess: (access_token) => {
+        localStorage.setItem("access_token", access_token);
         toast.success("Logged in with GitHub");
         navigate("/chat");
       },

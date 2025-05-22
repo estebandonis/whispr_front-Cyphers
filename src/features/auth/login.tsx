@@ -2,73 +2,32 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { NavLink, useNavigate } from "react-router";
 import CornerAccents from "@/components/corner-accents";
-import { Github } from "lucide-react";
-import {
-  useLogin,
-  useValidateGithubToken,
-  useValidateJwtToken,
-} from "./queries";
+import { Github, Loader2 } from "lucide-react";
+import { useLogin } from "./queries";
 import { toast } from "sonner";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-
-  const [jwtToken, setJwtToken] = useState<string | undefined>(undefined);
-  const [githubToken, setGithubToken] = useState<string | undefined>(undefined);
-
-  // Effect to load tokens from localStorage once
-  useEffect(() => {
-    const storedJwtToken = localStorage.getItem("jwt-token") || undefined;
-    const storedGithubToken =
-      localStorage.getItem("github-oauth-token") || undefined;
-    setJwtToken(storedJwtToken);
-    setGithubToken(storedGithubToken);
-  }, []);
-
-  const { data: jwtTokenValid } = useValidateJwtToken(jwtToken);
-  const { data: githubTokenValid } = useValidateGithubToken(githubToken);
-
-  useEffect(() => {
-    if (jwtTokenValid) {
-      navigate("/chat");
-    } else if (githubTokenValid) {
-      navigate("/chat");
-    }
-  }, [jwtTokenValid, githubTokenValid]);
 
   const { mutate: login, isPending: loggingIn } = useLogin();
   const navigate = useNavigate();
 
   const handleLogin = () => {
     login(
-      { email, password },
+      { username, password },
       {
-        onSuccess: (token) => {
-          localStorage.setItem("jwt-token", token);
+        onSuccess: (access_token) => {
+          localStorage.setItem("access_token", access_token);
           toast.success("Logged in");
           navigate("/chat");
         },
         onError: (error) => {
-          let errorMessage = "An unexpected error occurred.";
-          if (
-            error &&
-            typeof error === "object" &&
-            "response" in error &&
-            error.response &&
-            typeof error.response === "object" &&
-            "data" in error.response &&
-            error.response.data &&
-            typeof error.response.data === "object" &&
-            "error" in error.response.data
-          ) {
-            errorMessage = (error.response.data as { error: string }).error;
-          }
           toast.error("Error logging in", {
-            description: errorMessage,
+            description: error.message,
           });
         },
       }
@@ -83,11 +42,11 @@ export default function LoginPage() {
           Whispr
         </h1>
         <Input
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           disabled={loggingIn}
-          type="email"
+          type="text"
         />
         <Input
           placeholder="Password"
@@ -96,12 +55,14 @@ export default function LoginPage() {
           disabled={loggingIn}
           type="password"
         />
-        <Button
-          asChild
-          className="uppercase cursor-pointer font-medium"
-          disabled={loggingIn}
-        >
-          <button onClick={handleLogin}>Sign in</button>
+        <Button asChild className="uppercase cursor-pointer font-medium">
+          <button onClick={handleLogin} disabled={loggingIn}>
+            {loggingIn ? (
+              <Loader2 className="animate-spin size-4" />
+            ) : (
+              "Sign in"
+            )}
+          </button>
         </Button>
         {/* Github OAuth 2 login */}
         <div className="flex items-center justify-center">

@@ -5,25 +5,30 @@ import {
 } from "@tanstack/react-query";
 import api from "@/lib/api";
 
-const login = async (email: string, password: string): Promise<string> => {
+const login = async (username: string, password: string): Promise<string> => {
   const {
-    data: { token },
-  } = await api.post("/auth/login", { username: email, password });
-  return token;
+    data: { access_token },
+  } = await api.post("/auth/login", { username, password });
+  return access_token;
 };
 
 export const useLogin = () => {
   return useMutation({
-    mutationFn: ({ email, password }: { email: string; password: string }) =>
-      login(email, password),
+    mutationFn: ({
+      username,
+      password,
+    }: {
+      username: string;
+      password: string;
+    }) => login(username, password),
   });
 };
 
 const loginWithGithubOAuth = async (code: string): Promise<string> => {
   const {
-    data: { token },
+    data: { access_token },
   } = await api.post("/auth/oauth/github", { code });
-  return token;
+  return access_token;
 };
 
 export const useGithubOAuthLogin = () => {
@@ -32,17 +37,28 @@ export const useGithubOAuthLogin = () => {
   });
 };
 
-const register = async (email: string, password: string): Promise<boolean> => {
+const register = async (
+  name: string,
+  username: string,
+  password: string
+): Promise<boolean> => {
   const {
     data: { success },
-  } = await api.post("/auth/register", { email, password });
+  } = await api.post("/auth/register", { name, username, password });
   return success;
 };
 
 export const useRegister = () => {
   return useMutation({
-    mutationFn: ({ email, password }: { email: string; password: string }) =>
-      register(email, password),
+    mutationFn: ({
+      name,
+      username,
+      password,
+    }: {
+      name: string;
+      username: string;
+      password: string;
+    }) => register(name, username, password),
   });
 };
 
@@ -59,27 +75,8 @@ const validateJwtToken = async (token?: string): Promise<boolean> => {
 
 export const useValidateJwtToken = (token?: string) => {
   return useQuery({
-    queryKey: ["jwt-token", token],
+    queryKey: ["access_token", token],
     queryFn: () => validateJwtToken(token),
-    enabled: !!token,
-  });
-};
-
-const validateGithubToken = async (token?: string): Promise<boolean> => {
-  const {
-    data: { valid },
-  } = await api.get("/auth/validate-token/github", {
-    params: {
-      token,
-    },
-  });
-  return valid;
-};
-
-export const useValidateGithubToken = (token?: string) => {
-  return useQuery({
-    queryKey: ["github-token", token],
-    queryFn: () => validateGithubToken(token),
     enabled: !!token,
   });
 };
