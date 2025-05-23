@@ -17,6 +17,11 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   const handleLogin = () => {
+    if (!username.trim() || !password.trim()) {
+      toast.error("Missing fields");
+      return;
+    }
+
     login(
       { username, password },
       {
