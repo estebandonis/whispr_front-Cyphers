@@ -1,6 +1,6 @@
-import { useValidateJwtToken } from "@/features/auth/queries";
 import Loading from "@/features/loading";
-import { ReactNode, useEffect, useState } from "react";
+import { useCurrentUser } from "@/features/user/queries";
+import { ReactNode } from "react";
 import { Navigate } from "react-router";
 
 interface ProtectedRouteProps {
@@ -8,25 +8,17 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const [jwtToken, setJwtToken] = useState<string | undefined | null>();
-  const { data: jwtTokenValid, isLoading: validating } = useValidateJwtToken(
-    jwtToken || undefined
-  );
+  const {
+    data: user,
+    isLoading: loadingUser,
+    error: errorUser,
+  } = useCurrentUser();
 
-  useEffect(() => {
-    handleGetAccessToken();
-  }, []);
-
-  const handleGetAccessToken = () => {
-    const access_token = localStorage.getItem("access_token");
-    setJwtToken(access_token);
-  };
-
-  if (jwtToken === undefined || validating) {
+  if (loadingUser) {
     return <Loading />;
   }
 
-  if (jwtToken === null || jwtTokenValid === false) {
+  if (errorUser || !user) {
     return <Navigate to="/" />;
   }
 
