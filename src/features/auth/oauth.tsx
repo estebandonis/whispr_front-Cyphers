@@ -1,38 +1,38 @@
-import { useEffect, useState } from "react";
-import Loading from "../loading";
-import { Loader2, Github, ChevronLeft } from "lucide-react";
-import { NavLink, useNavigate } from "react-router";
-import { useGithubOAuthLogin } from "./queries";
+import { ChevronLeft, Github, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef } from "react";
+import { NavLink, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
+import { useGithubOAuthLogin } from "./queries";
 
 export default function OAuth() {
   const {
-    mutate: loginWithGithubOAuth,
+    mutateAsync: loginWithGithubOAuth,
     isPending: loggingIn,
     error,
   } = useGithubOAuthLogin();
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const oauthInitiated = useRef(false);
 
-  useEffect(() => {
-    // get the /path/oauth-callback?code=...
-    const code = new URLSearchParams(window.location.search).get("code");
-    if (!code) return;
+  const handleOAuth = useCallback(
+    async (code: string) => {
+      // Prevent multiple OAuth attempts
+      if (oauthInitiated.current) return;
+      oauthInitiated.current = true;
+      console.log("Starting OAuth with code:", code);
 
-    handleOAuth(code);
-  }, []);
+      try {
+        const result = await loginWithGithubOAuth(code);
 
-  const handleOAuth = async (code: string) => {
-    setLoading(false);
-    loginWithGithubOAuth(code, {
-      onSuccess: ({ access_token, refresh_token }) => {
-        localStorage.setItem("access_token", access_token);
-        localStorage.setItem("refresh_token", refresh_token);
+        localStorage.setItem("access_token", result.access_token);
+        localStorage.setItem("refresh_token", result.refresh_token);
         toast.success("Logged in with GitHub");
         navigate("/chat");
-      },
-      onError: (error) => {
-        // console.log("error:", error);
+      } catch (error) {
+        console.log("OAuth error:", error);
+        // Reset the flag on error so user can retry if needed
+        oauthInitiated.current = false;
+
         let errorMessage =
           "An unexpected error occurred during GitHub authentication.";
         if (
@@ -51,13 +51,17 @@ export default function OAuth() {
         toast.error("Error authenticating with GitHub", {
           description: errorMessage,
         });
-      },
-    });
-  };
+      }
+    },
+    [loginWithGithubOAuth, navigate]
+  );
 
-  if (loading) {
-    return <Loading />;
-  }
+  useEffect(() => {
+    const code = searchParams.get("code");
+    if (!code) return;
+
+    handleOAuth(code);
+  }, [handleOAuth, searchParams]);
 
   if (error) {
     return (

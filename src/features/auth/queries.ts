@@ -30,10 +30,15 @@ export const useLogin = () => {
 const loginWithGithubOAuth = async (
   code: string
 ): Promise<{ access_token: string; refresh_token: string }> => {
-  const {
-    data: { access_token, refresh_token },
-  } = await api.post("/auth/oauth/github", { code });
-  return { access_token, refresh_token };
+  try {
+    const response = await api.post("/auth/oauth/github", { code });
+    const {
+      data: { access_token, refresh_token },
+    } = response;
+    return { access_token, refresh_token };
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const useGithubOAuthLogin = () => {
