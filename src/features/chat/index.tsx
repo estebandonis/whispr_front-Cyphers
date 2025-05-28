@@ -21,6 +21,7 @@ import api from "@/lib/api";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { useCurrentUser } from "@/features/user/queries";
+import { hc } from 'hono/client'
 import {
   useGetUserKeyBundle,
   useInitiateConversation,
@@ -60,6 +61,7 @@ export default function Chat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isInitializingConversation, setIsInitializingConversation] =
     useState(false);
+  const [messageToSend, setMessageToSend] = useState();
 
   // Refs to store cryptographic keys
   const conversationKeysRef = useRef<{
@@ -69,13 +71,15 @@ export default function Chat() {
     theirSignPubKey?: JsonWebKey;
   } | null>(null);
 
+  const wsRef = useRef<WebSocket | null>(null);
+
   // React Query hooks
   const { data: keyBundle, isLoading: isLoadingKeyBundle } =
     useGetUserKeyBundle(userId || "", {
       enabled: !!userId && !conversationId && !isInitializingConversation,
     });
   const { mutateAsync: initiateConversation } = useInitiateConversation();
-  const { mutateAsync: sendMessage } = useSendMessage();
+  // const { mutateAsync: sendMessage } = useSendMessage();
 
   // Add hooks for pending conversations
   const { data: pendingConversations, isLoading: isLoadingPending } =
@@ -146,6 +150,52 @@ export default function Chat() {
 
     checkExistingConversation();
   }, [userId, keyBundle, pendingConversations]);
+
+useEffect(() => {
+  console.log(isSessionEstablished, conversationId);
+  if (isSessionEstablished && conversationId) {
+    console.log("Connecting to WebSocket...");
+    const wsUrl = `ws://localhost:3000/message/ws/${conversationId}`;
+    const ws = new WebSocket(wsUrl);
+    
+    // Store WebSocket reference
+    wsRef.current = ws;
+
+    ws.addEventListener('open', () => {
+      console.log("WebSocket connection opened");
+    });
+
+    ws.addEventListener('message', (event) => {
+      console.log("Received message: ", event.data);
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'message' && data.encryptedContent) {
+          // Process the received encrypted message
+          processReceivedMessage(data.encryptedContent);
+        }
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
+      }
+    });
+
+    ws.addEventListener('close', () => {
+      console.log("WebSocket connection closed");
+      wsRef.current = null;
+    });
+
+    ws.addEventListener('error', (error) => {
+      console.error("WebSocket error:", error);
+    });
+
+    // Cleanup on unmount or dependency change
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }
+}, [isSessionEstablished, conversationId]);
 
   // no pending -> generas llaves -> encriptas con x3dh (con bundle del otro) -> creas conversaciones con payload encriptado
   // si pending -> agarras payload encriptado -> agarras bundle del otro, derivas con 3xdh -> desencriptas -> guardas llaves descriptadas -> marcas como finalizada
@@ -421,13 +471,32 @@ export default function Chat() {
         currentUser?.id?.toString() || "" // Use current user ID
       );
 
+      // Send through WebSocket if connected
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        const messagePayload = {
+          type: 'message',
+          room: conversationId,
+          encryptedContent: JSON.stringify(secureMessage),
+          senderId: currentUser?.id?.toString() || "",
+          timestamp: Date.now()
+        };
+        
+        wsRef.current.send(JSON.stringify(messagePayload));
+        console.log("Message sent through WebSocket");
+      } else {
+        console.error("WebSocket not connected, cannot send message");
+        // Optionally fall back to HTTP API
+        // await sendMessage({...});
+        return;
+      }
+
       // Send the message to the server
-      await sendMessage({
-        conversationId: conversationKeysRef.current.convId,
-        message: message, // Plain text for local storage only
-        encryptedContent: JSON.stringify(secureMessage),
-        senderId: currentUser?.id?.toString() || "", // Use current user ID
-      });
+      // await sendMessage({
+      //   conversationId: conversationKeysRef.current.convId,
+      //   message: message, // Plain text for local storage only
+      //   encryptedContent: JSON.stringify(secureMessage),
+      //   senderId: currentUser?.id?.toString() || "", // Use current user ID
+      // });
 
       // Add the message to the local chat
       const newMessage: Message = {
@@ -443,6 +512,8 @@ export default function Chat() {
 
       setChatMessages((prev) => [...prev, newMessage]);
       setMessage("");
+
+      return secureMessage;
     } catch (error) {
       console.error("Failed to send message:", error);
     }

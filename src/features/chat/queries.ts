@@ -129,11 +129,12 @@ export const useAcceptConversation = () => {
       conversationId: string | number;
       signingPublicKey: any; // JWK format
     }) => {
-      const { data } = await api.post(
+      const { data } = await api.put(
         `/conversations/${conversationId}/accept`,
         {
           signingPublicKey,
           responderId: getCurrentUserId(),
+          status: "FINISHED",
         }
       );
       return data;
