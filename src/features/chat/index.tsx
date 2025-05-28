@@ -202,6 +202,7 @@ export default function Chat() {
 
       // 5. Parse the decrypted message
       const keyMessage = JSON.parse(new TextDecoder().decode(decrypted));
+      console.log("Decrypted keyMessage:", keyMessage);
       const { convSignPub, convSignPriv, convSymKey, initiatorId } = keyMessage;
 
       // 6. Generate our own signing key pair for this conversation
@@ -212,9 +213,29 @@ export default function Chat() {
       );
 
       // 7. Import the symmetric key from the initiator
+      console.log("convSymKey type:", typeof convSymKey);
+      console.log("convSymKey:", convSymKey);
+
+      // Handle both array and object formats
+      let symKeyArray;
+      if (Array.isArray(convSymKey)) {
+        symKeyArray = convSymKey;
+      } else if (typeof convSymKey === "object" && convSymKey !== null) {
+        // Convert object with numeric keys back to array
+        symKeyArray = Object.values(convSymKey);
+      } else {
+        throw new Error("Invalid convSymKey format: " + typeof convSymKey);
+      }
+
+      console.log("symKeyArray length:", symKeyArray.length);
+      console.log("symKeyArray first 8 bytes:", symKeyArray.slice(0, 8));
+
+      const symKeyBytes = new Uint8Array(symKeyArray);
+      console.log("symKeyBytes length:", symKeyBytes.length);
+
       const importedSymKey = await window.crypto.subtle.importKey(
         "raw",
-        new Uint8Array(convSymKey),
+        symKeyBytes,
         { name: "AES-GCM", length: 256 },
         true,
         ["encrypt", "decrypt"]
@@ -324,10 +345,18 @@ export default function Chat() {
       );
 
       // Step 4: Prepare initial key message
+      const symKeyArray = Array.from(new Uint8Array(exportedSymKey));
+      console.log(
+        "Exporting symKey as array, length:",
+        symKeyArray.length,
+        "first 8 bytes:",
+        symKeyArray.slice(0, 8)
+      );
+
       const keyMessage = {
         convSignPub: exportedSignPub,
         convSignPriv: exportedSignPriv,
-        convSymKey: exportedSymKey,
+        convSymKey: symKeyArray, // Convert ArrayBuffer to array for JSON
         initiatorId: currentUser?.id?.toString() || "", // Use current user ID
       };
 
