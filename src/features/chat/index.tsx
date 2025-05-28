@@ -166,7 +166,10 @@ export default function Chat() {
         pendingConvo.initialPayload;
 
       // 3. Derive the shared secret using X3DH (recipient side)
-      // This function needs to be implemented in crypto.ts
+      console.log("usedOPKId:", usedOPKId);
+      console.log("ephemeralKeyPublicJWK:", ephemeralKeyPublicJWK);
+      console.log("initiatorIdentityKey:", pendingConvo.initiatorIdentityKey);
+
       const { sharedKey } = await completeX3DHRecipient(
         ephemeralKeyPublicJWK,
         pendingConvo.initiatorIdentityKey || {}, // Provide a default empty object if not available
@@ -178,6 +181,19 @@ export default function Chat() {
       const ivArray = new Uint8Array(iv);
       const ciphertextArray = new Uint8Array(ciphertext);
 
+      console.log("Attempting to decrypt with shared key:", sharedKey);
+      console.log(
+        "IV length:",
+        ivArray.length,
+        "Ciphertext length:",
+        ciphertextArray.length
+      );
+      console.log("IV bytes:", Array.from(ivArray));
+      console.log(
+        "First 16 bytes of ciphertext:",
+        Array.from(ciphertextArray.slice(0, 16))
+      );
+
       const decrypted = await window.crypto.subtle.decrypt(
         { name: "AES-GCM", iv: ivArray },
         sharedKey,
@@ -186,6 +202,7 @@ export default function Chat() {
 
       // 5. Parse the decrypted message
       const keyMessage = JSON.parse(new TextDecoder().decode(decrypted));
+      console.log("Decrypted keyMessage:", keyMessage);
       const { convSignPub, convSignPriv, convSymKey, initiatorId } = keyMessage;
 
       // 6. Generate our own signing key pair for this conversation
@@ -196,9 +213,29 @@ export default function Chat() {
       );
 
       // 7. Import the symmetric key from the initiator
+      console.log("convSymKey type:", typeof convSymKey);
+      console.log("convSymKey:", convSymKey);
+
+      // Handle both array and object formats
+      let symKeyArray;
+      if (Array.isArray(convSymKey)) {
+        symKeyArray = convSymKey;
+      } else if (typeof convSymKey === "object" && convSymKey !== null) {
+        // Convert object with numeric keys back to array
+        symKeyArray = Object.values(convSymKey);
+      } else {
+        throw new Error("Invalid convSymKey format: " + typeof convSymKey);
+      }
+
+      console.log("symKeyArray length:", symKeyArray.length);
+      console.log("symKeyArray first 8 bytes:", symKeyArray.slice(0, 8));
+
+      const symKeyBytes = new Uint8Array(symKeyArray);
+      console.log("symKeyBytes length:", symKeyBytes.length);
+
       const importedSymKey = await window.crypto.subtle.importKey(
         "raw",
-        new Uint8Array(convSymKey),
+        symKeyBytes,
         { name: "AES-GCM", length: 256 },
         true,
         ["encrypt", "decrypt"]
@@ -272,6 +309,7 @@ export default function Chat() {
       console.log("Recipient's key bundle:", keyBundle);
 
       // Step 1: Run X3DH to establish a shared secret
+      console.log("Key bundle for X3DH:", keyBundle);
       const { sharedKey, ephemeralKeyPublicJWK, usedOPKId, initiatorIKPubJWK } =
         await initializeX3DHSession(keyBundle);
 
@@ -307,10 +345,18 @@ export default function Chat() {
       );
 
       // Step 4: Prepare initial key message
+      const symKeyArray = Array.from(new Uint8Array(exportedSymKey));
+      console.log(
+        "Exporting symKey as array, length:",
+        symKeyArray.length,
+        "first 8 bytes:",
+        symKeyArray.slice(0, 8)
+      );
+
       const keyMessage = {
         convSignPub: exportedSignPub,
         convSignPriv: exportedSignPriv,
-        convSymKey: exportedSymKey,
+        convSymKey: symKeyArray, // Convert ArrayBuffer to array for JSON
         initiatorId: currentUser?.id?.toString() || "", // Use current user ID
       };
 
@@ -324,6 +370,7 @@ export default function Chat() {
       );
 
       // Step 6: Send the encrypted key message to the recipient
+      console.log("Sending conversation initiation with usedOPKId:", usedOPKId);
       const initiationResponse = await initiateConversation({
         recipientId: userId,
         payload: {
