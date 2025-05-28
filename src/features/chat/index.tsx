@@ -41,7 +41,7 @@ interface Message {
 
 // Add this interface for pending conversations
 interface PendingConversation {
-  id: string | number;
+  id: number;
   initiatorId: string | number;
   initialPayload: {
     iv: number[];
@@ -65,7 +65,7 @@ export default function Chat() {
 
   // Refs to store cryptographic keys
   const conversationKeysRef = useRef<{
-    convId: string;
+    convId: number;
     symKey: CryptoKey;
     signKeyPair: CryptoKeyPair;
     theirSignPubKey?: JsonWebKey;
@@ -152,7 +152,6 @@ export default function Chat() {
   }, [userId, keyBundle, pendingConversations]);
 
 useEffect(() => {
-  console.log(isSessionEstablished, conversationId);
   if (isSessionEstablished && conversationId) {
     console.log("Connecting to WebSocket...");
     const wsUrl = `ws://localhost:3000/message/ws/${conversationId}`;
@@ -321,6 +320,7 @@ useEffect(() => {
 
       // 10. Save the conversation keys locally
       const convId = await saveConversationKeys(
+        pendingConvo.id,
         pendingConvo.initiatorId.toString(),
         importedSymKey,
         {
@@ -333,13 +333,16 @@ useEffect(() => {
 
       // 11. Update local state
       conversationKeysRef.current = {
-        convId,
+        convId: pendingConvo.id,
         symKey: convSymKey,
-        signKeyPair: mySignKeyPair,
+        signKeyPair: {
+          privateKey: importedSignPrivKey,
+          publicKey: importedSignPubKey,
+        },
         theirSignPubKey: convSignPub,
       };
 
-      setConversationId(convId);
+      setConversationId(pendingConvo.id.toString());
       setIsSessionEstablished(true);
       console.log("Processed pending conversation successfully");
     } catch (error) {
@@ -432,8 +435,11 @@ useEffect(() => {
         },
       });
 
+      console.log("Conversation initiation response:", initiationResponse);
+
       // Step 7: Save the conversation keys locally
       const convId = await saveConversationKeys(
+        Number(initiationResponse.conversationId),
         userId,
         convSymKey,
         convSignKeyPair
@@ -441,12 +447,12 @@ useEffect(() => {
 
       // Store keys in ref for later use
       conversationKeysRef.current = {
-        convId,
+        convId: Number(initiationResponse),
         symKey: convSymKey,
         signKeyPair: convSignKeyPair,
       };
 
-      setConversationId(convId);
+      setConversationId(initiationResponse);
       setIsSessionEstablished(true);
       console.log("New conversation initialized successfully with ID:", convId);
     } catch (error) {

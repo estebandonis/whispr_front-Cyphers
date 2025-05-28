@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 
 export interface ConversationKeys {
-  convId: string;
+  convId: number;
   userId: string;
   symKey: CryptoKey;
   signKeyPair: CryptoKeyPair;
@@ -16,14 +16,13 @@ const STORAGE_KEY = "whispr_conversations";
  * Save a conversation's cryptographic keys to local storage
  */
 export async function saveConversationKeys(
+  convId: number,
   userId: string,
   symKey: CryptoKey,
   signKeyPair: CryptoKeyPair,
   theirSignPubKey?: JsonWebKey,
   initiator: boolean = true
-): Promise<string> {
-  // Generate unique ID for this conversation
-  const convId = uuidv4();
+): Promise<number> {
 
   // Export keys for storage
   const exportedSymKey = await window.crypto.subtle.exportKey("jwk", symKey);
