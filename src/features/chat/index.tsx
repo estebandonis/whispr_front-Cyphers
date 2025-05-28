@@ -20,6 +20,7 @@ import { getCurrentUserId } from "@/lib/utils";
 import api from "@/lib/api";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
+import { useCurrentUser } from "@/features/user/queries";
 import {
   useGetUserKeyBundle,
   useInitiateConversation,
@@ -52,6 +53,7 @@ interface PendingConversation {
 
 export default function Chat() {
   const { id: userId } = useParams<{ id: string }>();
+  const { data: currentUser } = useCurrentUser();
   const [message, setMessage] = useState("");
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [isSessionEstablished, setIsSessionEstablished] = useState(false);
@@ -207,15 +209,15 @@ export default function Chat() {
         convSignPub,
         { name: "ECDSA", namedCurve: "P-256" },
         true,
-        ["verify"]  // Public key can only be used for verification
+        ["verify"] // Public key can only be used for verification
       );
-      
+
       const importedSignPrivKey = await window.crypto.subtle.importKey(
         "jwk",
         convSignPriv,
         { name: "ECDSA", namedCurve: "P-256" },
         true,
-        ["sign"]  // Public key can only be used for verification
+        ["sign"] // Public key can only be used for verification
       );
 
       // 8. Export our public signing key to send back
@@ -309,7 +311,7 @@ export default function Chat() {
         convSignPub: exportedSignPub,
         convSignPriv: exportedSignPriv,
         convSymKey: exportedSymKey,
-        initiatorId: getCurrentUserId(), // Get the current user's ID
+        initiatorId: currentUser?.id?.toString() || "", // Use current user ID
       };
 
       // Step 5: Encrypt the key message with the shared secret from X3DH
@@ -329,7 +331,7 @@ export default function Chat() {
           ciphertext: Array.from(new Uint8Array(encrypted)),
           ephemeralKeyPublicJWK,
           usedOPKId,
-          initiatorId: getCurrentUserId(), // Get the current user's ID
+          initiatorId: currentUser?.id?.toString() || "", // Use current user ID
         },
       });
 
@@ -369,7 +371,7 @@ export default function Chat() {
         message,
         symKey,
         signKeyPair.privateKey,
-        getCurrentUserId() // Get the current user's ID
+        currentUser?.id?.toString() || "" // Use current user ID
       );
 
       // Send the message to the server
@@ -377,13 +379,13 @@ export default function Chat() {
         conversationId: conversationKeysRef.current.convId,
         message: message, // Plain text for local storage only
         encryptedContent: JSON.stringify(secureMessage),
-        senderId: getCurrentUserId(), // Get the current user's ID
+        senderId: currentUser?.id?.toString() || "", // Use current user ID
       });
 
       // Add the message to the local chat
       const newMessage: Message = {
         id: Date.now(),
-        sender: "You",
+        sender: currentUser?.name || "You",
         text: message,
         time: new Date().toLocaleTimeString([], {
           hour: "2-digit",
@@ -471,7 +473,7 @@ export default function Chat() {
       {/* Header */}
       <header className="p-4 border-b border-neutral-800">
         <h1 className="text-xl font-heading tracking-tighter font-medium uppercase text-neutral-300">
-          {userId}
+          Chat with User {userId}
         </h1>
         <p className="text-xs text-neutral-500">
           {isSessionEstablished
