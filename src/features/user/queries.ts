@@ -7,7 +7,6 @@ import api from "@/lib/api";
 
 const getUser = async (): Promise<User> => {
   const { data } = await api.get("/user/me");
-  console.log("user:", data);
   return data;
 };
 
