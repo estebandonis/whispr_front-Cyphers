@@ -21,7 +21,7 @@ import api from "@/lib/api";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { useCurrentUser } from "@/features/user/queries";
-import { hc } from 'hono/client'
+import { hc } from "hono/client";
 import {
   useGetUserKeyBundle,
   useInitiateConversation,
@@ -151,50 +151,50 @@ export default function Chat() {
     checkExistingConversation();
   }, [userId, keyBundle, pendingConversations]);
 
-useEffect(() => {
-  if (isSessionEstablished && conversationId) {
-    console.log("Connecting to WebSocket...");
-    const wsUrl = `ws://localhost:3000/message/ws/${conversationId}`;
-    const ws = new WebSocket(wsUrl);
-    
-    // Store WebSocket reference
-    wsRef.current = ws;
+  useEffect(() => {
+    if (isSessionEstablished && conversationId) {
+      console.log("Connecting to WebSocket...");
+      const wsUrl = `ws://localhost:3000/message/ws/${conversationId}`;
+      const ws = new WebSocket(wsUrl);
 
-    ws.addEventListener('open', () => {
-      console.log("WebSocket connection opened");
-    });
+      // Store WebSocket reference
+      wsRef.current = ws;
 
-    ws.addEventListener('message', (event) => {
-      console.log("Received message: ", event.data);
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'message' && data.encryptedContent) {
-          // Process the received encrypted message
-          processReceivedMessage(data.encryptedContent);
+      ws.addEventListener("open", () => {
+        console.log("WebSocket connection opened");
+      });
+
+      ws.addEventListener("message", (event) => {
+        console.log("Received message: ", event.data);
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "message" && data.encryptedContent) {
+            // Process the received encrypted message
+            processReceivedMessage(data.encryptedContent);
+          }
+        } catch (error) {
+          console.error("Error parsing WebSocket message:", error);
         }
-      } catch (error) {
-        console.error("Error parsing WebSocket message:", error);
-      }
-    });
+      });
 
-    ws.addEventListener('close', () => {
-      console.log("WebSocket connection closed");
-      wsRef.current = null;
-    });
-
-    ws.addEventListener('error', (error) => {
-      console.error("WebSocket error:", error);
-    });
-
-    // Cleanup on unmount or dependency change
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
+      ws.addEventListener("close", () => {
+        console.log("WebSocket connection closed");
         wsRef.current = null;
-      }
-    };
-  }
-}, [isSessionEstablished, conversationId]);
+      });
+
+      ws.addEventListener("error", (error) => {
+        console.error("WebSocket error:", error);
+      });
+
+      // Cleanup on unmount or dependency change
+      return () => {
+        if (wsRef.current) {
+          wsRef.current.close();
+          wsRef.current = null;
+        }
+      };
+    }
+  }, [isSessionEstablished, conversationId]);
 
   // no pending -> generas llaves -> encriptas con x3dh (con bundle del otro) -> creas conversaciones con payload encriptado
   // si pending -> agarras payload encriptado -> agarras bundle del otro, derivas con 3xdh -> desencriptas -> guardas llaves descriptadas -> marcas como finalizada
@@ -334,7 +334,7 @@ useEffect(() => {
       // 11. Update local state
       conversationKeysRef.current = {
         convId: pendingConvo.id,
-        symKey: convSymKey,
+        symKey: importedSymKey,
         signKeyPair: {
           privateKey: importedSignPrivKey,
           publicKey: importedSignPubKey,
@@ -480,13 +480,13 @@ useEffect(() => {
       // Send through WebSocket if connected
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         const messagePayload = {
-          type: 'message',
+          type: "message",
           room: conversationId,
           encryptedContent: JSON.stringify(secureMessage),
           senderId: currentUser?.id?.toString() || "",
-          timestamp: Date.now()
+          timestamp: Date.now(),
         };
-        
+
         wsRef.current.send(JSON.stringify(messagePayload));
         console.log("Message sent through WebSocket");
       } else {
