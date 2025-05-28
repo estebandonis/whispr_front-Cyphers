@@ -4,15 +4,21 @@ import {
   // useQueryClient
 } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
 
 const login = async (
   username: string,
   password: string
-): Promise<{ access_token: string; refresh_token: string }> => {
+): Promise<{
+  access_token?: string;
+  refresh_token?: string;
+  mfa?: boolean;
+  userId?: string;
+}> => {
   const {
-    data: { access_token, refresh_token },
+    data: { access_token, refresh_token, mfa, userId },
   } = await api.post("/auth/login", { username, password });
-  return { access_token, refresh_token };
+  return { access_token, refresh_token, mfa, userId };
 };
 
 export const useLogin = () => {
@@ -29,12 +35,17 @@ export const useLogin = () => {
 
 const loginWithGithubOAuth = async (
   code: string
-): Promise<{ access_token: string; refresh_token: string }> => {
+): Promise<{
+  access_token?: string;
+  refresh_token?: string;
+  mfa?: boolean;
+  userId?: string;
+}> => {
   const response = await api.post("/auth/oauth/github", { code });
   const {
-    data: { access_token, refresh_token },
+    data: { access_token, refresh_token, mfa, userId },
   } = response;
-  return { access_token, refresh_token };
+  return { access_token, refresh_token, mfa, userId };
 };
 
 export const useGithubOAuthLogin = () => {
@@ -97,5 +108,64 @@ const logout = async (): Promise<boolean> => {
 export const useLogout = () => {
   return useMutation({
     mutationFn: logout,
+  });
+};
+
+const setupMfa = async (): Promise<{
+  secret: string;
+  qrCode: string;
+}> => {
+  const {
+    data: { secret, qrCode },
+  } = await api.post("/auth/mfa/setup");
+  return { secret, qrCode };
+};
+
+export const useSetUpMfa = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: setupMfa,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+    },
+  });
+};
+
+const verifyMfa = async (
+  token: string,
+  userId: string
+): Promise<{
+  access_token: string;
+  refresh_token: string;
+}> => {
+  const {
+    data: { access_token, refresh_token },
+  } = await api.post("/auth/mfa/verify", { token, userId });
+  return { access_token, refresh_token };
+};
+
+export const useVerifyMfa = () => {
+  return useMutation({
+    mutationFn: ({ token, userId }: { token: string; userId: string }) =>
+      verifyMfa(token, userId),
+  });
+};
+
+const resetMfa = async (): Promise<{ message: string }> => {
+  const {
+    data: { message },
+  } = await api.post("/auth/mfa/reset");
+  return { message };
+};
+
+export const useResetMfa = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: resetMfa,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+    },
   });
 };

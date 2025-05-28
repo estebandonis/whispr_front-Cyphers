@@ -24,6 +24,16 @@ export default function OAuth() {
       try {
         const result = await loginWithGithubOAuth(code);
 
+        if (result.mfa && result.userId) {
+          navigate(`/mfa/verify?userId=${result.userId}`);
+          return;
+        }
+
+        if (!result.access_token || !result.refresh_token) {
+          toast.error("Error logging in with GitHub");
+          return;
+        }
+
         localStorage.setItem("access_token", result.access_token);
         localStorage.setItem("refresh_token", result.refresh_token);
         toast.success("Logged in with GitHub");

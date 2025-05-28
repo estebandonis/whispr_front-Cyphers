@@ -1,15 +1,28 @@
 import CornerAccents from "@/components/corner-accents";
 import { SettingsIcon, LogOut } from "lucide-react";
-import { Outlet, NavLink } from "react-router";
+import { Outlet, NavLink, Link } from "react-router";
 import { cn, logout } from "@/lib/utils";
 import { useListUsers } from "@/features/chat/queries";
 import { useCurrentUser } from "@/features/user/queries";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import Loading from "@/features/loading";
+import MfaResetDialog from "@/components/mfa-reset-dialog";
+import { useState } from "react";
 
 export default function ChatLayout() {
   const { data: users } = useListUsers();
   const { data: currentUser } = useCurrentUser();
 
-  let groupChats = [
+  const [mfaResetDialog, setMfaResetDialog] = useState<boolean>(false);
+
+  const groupChats = [
     {
       id: 1,
       name: "Project Alpha",
@@ -39,6 +52,10 @@ export default function ChatLayout() {
     },
   ];
 
+  if (!users) {
+    return <Loading />;
+  }
+
   return (
     <div className="flex h-screen">
       <aside className="w-80 flex flex-col bg-neutral-900 border-r border-neutral-800">
@@ -52,13 +69,13 @@ export default function ChatLayout() {
           {/* Users */}
           <div>
             <h2 className="text-xs uppercase font-medium text-neutral-500 mb-3">
-              {users?.filter((user: any) => user.id !== currentUser?.id).length}{" "}
+              {users?.filter((user) => user.id !== currentUser?.id).length}{" "}
               Users
             </h2>
             <div className="flex flex-col ">
               {users
-                ?.filter((user: any) => user.id !== currentUser?.id)
-                .map((user: any) => (
+                ?.filter((user) => user.id !== currentUser?.id)
+                .map((user) => (
                   <NavLink
                     key={user.id}
                     to={`/chat/${user.id}`}
@@ -146,9 +163,27 @@ export default function ChatLayout() {
                 {currentUser?.username || ""}
               </p>
             </div>
-            <button className="p-2 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded">
+            {/* <button className="p-2 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded">
               <SettingsIcon className="size-4" />
-            </button>
+            </button> */}
+            <DropdownMenu>
+              <DropdownMenuTrigger className="p-2 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded cursor-pointer">
+                <SettingsIcon className="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuLabel>Settings</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Link to="/mfa/setup">Setup MFA</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => setMfaResetDialog(true)}
+                >
+                  Disable MFA
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <button
               onClick={logout}
               type="button"
@@ -163,6 +198,8 @@ export default function ChatLayout() {
       <main className="flex-1 bg-neutral-950">
         <Outlet />
       </main>
+
+      <MfaResetDialog open={mfaResetDialog} onOpenChange={setMfaResetDialog} />
     </div>
   );
 }

@@ -25,7 +25,17 @@ export default function LoginPage() {
     login(
       { username, password },
       {
-        onSuccess: ({ access_token, refresh_token }) => {
+        onSuccess: ({ access_token, refresh_token, mfa, userId }) => {
+          console.log(access_token, refresh_token, mfa, userId);
+          if (mfa && userId) {
+            navigate(`/mfa/verify?userId=${userId}`);
+            return;
+          }
+
+          if (!access_token || !refresh_token) {
+            toast.error("Error logging in");
+            return;
+          }
           localStorage.setItem("access_token", access_token);
           localStorage.setItem("refresh_token", refresh_token);
           toast.success("Logged in");

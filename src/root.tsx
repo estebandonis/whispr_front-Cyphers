@@ -11,6 +11,8 @@ import OAuth from "./features/auth/oauth.tsx";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import ProtectedRoute from "./layouts/protected-route.tsx";
+import MfaVerify from "@/features/auth/mfa-verify.tsx";
+import MfaSetup from "@/features/auth/mfa-setup.tsx";
 
 export const queryClient = new QueryClient();
 
@@ -23,6 +25,20 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/" element={<LoginPage />} />
             <Route path="/sign-up" element={<SignUpPage />} />
             <Route path="/oauth-callback" element={<OAuth />} />
+            <Route
+              path="/mfa"
+              children={[
+                <Route path="/mfa/verify" element={<MfaVerify />} />,
+                <Route
+                  path="/mfa/setup"
+                  element={
+                    <ProtectedRoute>
+                      <MfaSetup />
+                    </ProtectedRoute>
+                  }
+                />,
+              ]}
+            />
             <Route
               path="/chat"
               element={
