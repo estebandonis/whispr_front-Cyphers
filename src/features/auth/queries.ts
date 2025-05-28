@@ -169,3 +169,21 @@ export const useResetMfa = () => {
     },
   });
 };
+
+const enableMfa = async (): Promise<{ message: string }> => {
+  const {
+    data: { message },
+  } = await api.post("/auth/mfa/enable");
+  return { message };
+};
+
+export const useEnableMfa = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: enableMfa,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+    },
+  });
+};
