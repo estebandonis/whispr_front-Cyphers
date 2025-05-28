@@ -62,17 +62,11 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       const refreshToken = localStorage.getItem("refresh_token"); // Assumed key for refresh token
-      const userId = localStorage.getItem("userId"); // Get userId from localStorage
 
-      if (!refreshToken || !userId) {
-        console.log("No refresh token or userId available. Clearing tokens.");
+      if (!refreshToken) {
+        console.log("No refresh token available. Clearing tokens.");
         localStorage.removeItem("access_token"); // Changed from jwt-token
         localStorage.removeItem("refresh_token"); // Ensure refresh token is also cleared
-        if (!userId) {
-          console.error(
-            "userId not found in localStorage. Cannot refresh token."
-          );
-        }
         // Potentially redirect to login page or dispatch a logout action
         isRefreshing = false;
         processQueue(error, null); // Reject queued requests
@@ -85,7 +79,7 @@ api.interceptors.response.use(
         // Updated endpoint and request body
         const refreshResponse = await axios.post(
           `${import.meta.env.VITE_SERVER_URL}/auth/refresh-token`, // Changed endpoint
-          { userId: userId, refresh_token: refreshToken } // Changed body
+          { refresh_token: refreshToken } // Changed body
         );
 
         // Assumed response structure: { access_token: "new-access-token", refresh_token: "new-refresh-token" }
