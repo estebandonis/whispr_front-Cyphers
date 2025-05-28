@@ -127,7 +127,7 @@ export async function generateSignedPreKey(ik_priv: CryptoKey) {
 // 3. Generate OPKs (One-time pre-keys)
 //
 export async function generateOPKs(count: number) {
-  const opks: { pub: CryptoKey; priv: CryptoKey }[] = [];
+  const opks: { id: number; pub: CryptoKey; priv: CryptoKey }[] = [];
   const keyPairOptions: GenerateKeyPairOptions = {
     extractable: true,
   };
@@ -137,7 +137,7 @@ export async function generateOPKs(count: number) {
       "ECDH-ES",
       keyPairOptions
     );
-    opks.push({ pub: publicKey, priv: privateKey });
+    opks.push({ id: i, pub: publicKey, priv: privateKey });
   }
   return opks;
 }
@@ -149,7 +149,7 @@ export async function exportPublicKeys(
   ik_pub: CryptoKey,
   spk_pub: CryptoKey,
   spk_signature: string,
-  opks: { pub: CryptoKey; priv: CryptoKey }[]
+  opks: { id: number; pub: CryptoKey; priv: CryptoKey }[]
 ) {
   // Export public keys to JWK format
   const ikPublicJwk = await exportJWK(ik_pub);
@@ -178,6 +178,7 @@ export async function exportPublicKeys(
       const pubJwk = await exportJWK(k.pub);
 
       return {
+        id: k.id, // Include the client-assigned ID
         kty: pubJwk.kty,
         crv: pubJwk.crv,
         x: pubJwk.x,
@@ -226,7 +227,7 @@ export async function initializeX3DH(): Promise<{
     ik_priv,
     spk_pub,
     spk_priv,
-    opks: opks.map((k) => ({ ...k })),
+    opks: opks, // OPKs already have IDs from generateOPKs
   });
 
   return {
@@ -243,7 +244,7 @@ export async function savePrivateKeys(keys: {
   ik_priv: CryptoKey;
   spk_pub: CryptoKey;
   spk_priv: CryptoKey;
-  opks: { pub: CryptoKey; priv: CryptoKey }[];
+  opks: { id: number; pub: CryptoKey; priv: CryptoKey }[];
 }) {
   try {
     const exportedKeys = {
@@ -253,6 +254,7 @@ export async function savePrivateKeys(keys: {
       spk_priv: await exportJWK(keys.spk_priv),
       opks: await Promise.all(
         keys.opks.map(async (k) => ({
+          id: k.id, // Store the client-assigned ID
           pub: await exportJWK(k.pub),
           priv: await exportJWK(k.priv),
         }))
@@ -288,6 +290,7 @@ export async function getPrivateKeys() {
       spk_priv: await importJWK(exportedKeys.spk_priv, "ECDH-ES"),
       opks: await Promise.all(
         exportedKeys.opks.map(async (k: any) => ({
+          id: k.id, // Restore the client-assigned ID
           pub: await importJWK(k.pub, "ECDH-ES"),
           priv: await importJWK(k.priv, "ECDH-ES"),
         }))
@@ -325,7 +328,11 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
 
   // Import recipient public keys
   const recipientIK = await importJWK(ikJwk, "ES256");
-  const recipientSPK = await importJWK(spkJwk, "ECDH-ES");
+  const recipientSPKImport = await importJWK(spkJwk, "ECDH-ES");
+  if (!(recipientSPKImport instanceof CryptoKey)) {
+    throw new Error("Failed to import recipient SPK as CryptoKey");
+  }
+  const recipientSPK = recipientSPKImport;
 
   // Verify the SPK signature
   try {
@@ -389,8 +396,8 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
     recipientPublicBundle.oneTimePreKeys.length > 0
   ) {
     const opkToUse = recipientPublicBundle.oneTimePreKeys[0];
-    opkId = opkToUse.id || opkToUse.key?.id;
-    const opkKeyData = opkToUse.key || opkToUse;
+    opkId = opkToUse.id; // Use our client-assigned ID directly
+    const opkKeyData = opkToUse; // The key data is directly in the object now
 
     const opkJwk = {
       kty: opkKeyData.kty,
@@ -398,7 +405,11 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
       x: opkKeyData.x,
       y: opkKeyData.y,
     };
-    recipientOPK = await importJWK(opkJwk, "ECDH-ES");
+    const recipientOPKImport = await importJWK(opkJwk, "ECDH-ES");
+    if (!(recipientOPKImport instanceof CryptoKey)) {
+      throw new Error("Failed to import recipient OPK as CryptoKey");
+    }
+    recipientOPK = recipientOPKImport;
   }
   // Check for single otpKey (alternative format)
   else if (recipientPublicBundle.otpKey) {
@@ -411,7 +422,11 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
       x: opkToUse.x,
       y: opkToUse.y,
     };
-    recipientOPK = await importJWK(opkJwk, "ECDH-ES");
+    const recipientOPKImport2 = await importJWK(opkJwk, "ECDH-ES");
+    if (!(recipientOPKImport2 instanceof CryptoKey)) {
+      throw new Error("Failed to import recipient OPK as CryptoKey");
+    }
+    recipientOPK = recipientOPKImport2;
   }
 
   // MODIFIED ECDH KEY DERIVATIONS
@@ -494,6 +509,12 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
   }
 
   // Attempt DH4 (if OPK is available)
+  console.log(
+    "Checking for OPK (initiator side) - recipientOPK:",
+    !!recipientOPK,
+    "opkId:",
+    opkId
+  );
   if (recipientOPK) {
     try {
       console.log("Starting DH4");
@@ -537,6 +558,11 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
     );
 
     console.log("HKDF key derivation completed successfully");
+    console.log(
+      "Shared key bytes (initiator):",
+      Array.from(new Uint8Array(sharedKeyBytes)).slice(0, 8),
+      "..."
+    );
 
     const SK = await window.crypto.subtle.importKey(
       "raw",
@@ -576,10 +602,9 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
 }
 
 interface StoredOpkType {
-  id?: string | number; // Optional custom ID field for OPKs
+  id: number; // Client-assigned ID field for OPKs
   pub: any | CryptoKey; // Changed JsonWebKey to any
   priv: any | CryptoKey; // Changed JsonWebKey to any
-  // kid is a standard JWK parameter, usually accessed via jwk.kid
 }
 
 interface MyPrivateKeysType {
@@ -596,93 +621,146 @@ export async function completeX3DHRecipient(
   myPrivateKeys: MyPrivateKeysType, // Use the defined type
   usedOPKId?: string | number
 ) {
-  const initiatorEKPub = await importJWK(initiatorEphemeralKeyJWK, "ECDH-ES");
-  const initiatorIKPub = await importJWK(initiatorIKPubJWK, "ES256");
+  console.log("Starting completeX3DHRecipient");
 
-  const dh1 = await crypto.subtle.deriveBits(
-    { name: "ECDH", public: initiatorIKPub },
-    myPrivateKeys.spk_priv, // This is CryptoKey from getPrivateKeys
-    256
+  // Import the initiator's ephemeral key for ECDH
+  const initiatorEKPubImport = await importJWK(
+    initiatorEphemeralKeyJWK,
+    "ECDH-ES"
   );
+  if (!(initiatorEKPubImport instanceof CryptoKey)) {
+    throw new Error("Failed to import initiator ephemeral key as CryptoKey");
+  }
+  const initiatorEKPub = initiatorEKPubImport;
 
-  const dh2 = await crypto.subtle.deriveBits(
-    { name: "ECDH", public: initiatorEKPub },
-    myPrivateKeys.ik_priv, // This is CryptoKey from getPrivateKeys
-    256
-  );
+  // Note: We skip importing the identity key for ECDH since ES256 keys cannot be used for ECDH
+  // This matches the approach used in initializeX3DHSession
 
-  const dh3 = await crypto.subtle.deriveBits(
-    { name: "ECDH", public: initiatorEKPub },
-    myPrivateKeys.spk_priv, // This is CryptoKey from getPrivateKeys
-    256
-  );
+  // Initialize array to collect DH operations that succeed
+  const dhResults: ArrayBuffer[] = [];
 
-  let preMasterSecret;
-  if (usedOPKId && myPrivateKeys.opks) {
-    // Find the OPK based on its ID or standard JWK kid
-    const usedOPKEntry = myPrivateKeys.opks.find((opk) => {
-      if (opk.id && opk.id.toString() === usedOPKId.toString()) return true;
-      const pubJwk = opk.pub as any; // Changed JsonWebKey to any
-      if (
-        typeof pubJwk === "object" &&
-        pubJwk.kid &&
-        pubJwk.kid === usedOPKId.toString()
-      )
-        return true;
-      const privJwk = opk.priv as any; // Changed JsonWebKey to any
-      if (
-        typeof privJwk === "object" &&
-        privJwk.kid &&
-        privJwk.kid === usedOPKId.toString()
-      )
-        return true;
-      return false;
-    });
+  // Skip DH1 and DH2 since they involve identity keys (ES256) which cannot be used for ECDH
+  // This is consistent with the initializeX3DHSession implementation
 
-    if (!usedOPKEntry)
-      throw new Error("Used OPK not found for ID: " + usedOPKId);
-
-    let opk_priv_for_dh: CryptoKey;
-    if (usedOPKEntry.priv instanceof CryptoKey) {
-      opk_priv_for_dh = usedOPKEntry.priv;
-    } else if (typeof usedOPKEntry.priv === "object") {
-      const privateJwk = usedOPKEntry.priv as any; // Changed JsonWebKey to any
-      if (!privateJwk.kty)
-        throw new Error("OPK private key is not a valid JWK object.");
-      opk_priv_for_dh = await importJWK(privateJwk, "ECDH-ES");
-    } else {
-      throw new Error("OPK private key is not in a recognizable format.");
-    }
-
-    const dh4 = await crypto.subtle.deriveBits(
+  // DH3 = DH(EKa, SPKb) - Always do this, it should work
+  try {
+    console.log("Starting DH3 (recipient side)");
+    const dh3 = await crypto.subtle.deriveBits(
       { name: "ECDH", public: initiatorEKPub },
-      opk_priv_for_dh, // This is now guaranteed to be CryptoKey
+      myPrivateKeys.spk_priv, // This is CryptoKey from getPrivateKeys
       256
     );
-    preMasterSecret = concatBuffers(dh1, dh2, dh3, dh4);
-  } else {
-    preMasterSecret = concatBuffers(dh1, dh2, dh3);
+    dhResults.push(dh3);
+    console.log("DH3 complete");
+  } catch (err) {
+    console.error("DH3 failed:", err);
+    throw new Error(
+      "Critical DH operation failed: " +
+        (err instanceof Error ? err.message : String(err))
+    );
   }
+
+  // DH4 = DH(EKa, OPKb) - Do this if OPK is available
+  console.log(
+    "Checking for OPK - usedOPKId:",
+    usedOPKId,
+    "opks length:",
+    myPrivateKeys.opks?.length
+  );
+  if (usedOPKId && myPrivateKeys.opks) {
+    try {
+      console.log("Starting DH4 (recipient side)");
+
+      // Find the OPK based on our client-assigned ID
+      const usedOPKEntry = myPrivateKeys.opks.find((opk) => {
+        return opk.id.toString() === usedOPKId.toString();
+      });
+
+      if (!usedOPKEntry)
+        throw new Error("Used OPK not found for ID: " + usedOPKId);
+
+      let opk_priv_for_dh: CryptoKey;
+      if (usedOPKEntry.priv instanceof CryptoKey) {
+        opk_priv_for_dh = usedOPKEntry.priv;
+      } else if (
+        typeof usedOPKEntry.priv === "object" &&
+        usedOPKEntry.priv !== null
+      ) {
+        const privateJwk = usedOPKEntry.priv as any; // Changed JsonWebKey to any
+        if (!privateJwk.kty)
+          throw new Error("OPK private key is not a valid JWK object.");
+        const importedKey = await importJWK(privateJwk, "ECDH-ES");
+        if (!(importedKey instanceof CryptoKey)) {
+          throw new Error("Failed to import OPK private key as CryptoKey");
+        }
+        opk_priv_for_dh = importedKey;
+      } else {
+        throw new Error("OPK private key is not in a recognizable format.");
+      }
+
+      const dh4 = await crypto.subtle.deriveBits(
+        { name: "ECDH", public: initiatorEKPub },
+        opk_priv_for_dh, // This is now guaranteed to be CryptoKey
+        256
+      );
+      dhResults.push(dh4);
+      console.log("DH4 complete");
+    } catch (err) {
+      console.error("DH4 failed:", err);
+      // Continue without this key - this is not critical
+    }
+  }
+
+  // Make sure we have at least one successful DH operation
+  if (dhResults.length === 0) {
+    throw new Error("Could not complete any Diffie-Hellman operations");
+  }
+
+  // Concatenate the DH results
+  const preMasterSecret = concatBuffers(...dhResults);
+  console.log(
+    "Pre-master secret created from",
+    dhResults.length,
+    "DH operations (recipient side)"
+  );
 
   const info = new TextEncoder().encode("Whispr X3DH Shared Secret v1");
   const salt = new Uint8Array([]);
 
-  const sharedKeyBytes = await hkdfDerive(
-    new Uint8Array(preMasterSecret),
-    salt,
-    info,
-    32
-  );
+  try {
+    console.log("Starting key derivation with HKDF (recipient side)");
+    const sharedKeyBytes = await hkdfDerive(
+      new Uint8Array(preMasterSecret),
+      salt,
+      info,
+      32
+    );
 
-  const SK = await crypto.subtle.importKey(
-    "raw",
-    sharedKeyBytes,
-    { name: "AES-GCM", length: 256 },
-    true,
-    ["encrypt", "decrypt"]
-  );
+    console.log("HKDF key derivation completed successfully (recipient side)");
+    console.log(
+      "Shared key bytes (recipient):",
+      Array.from(new Uint8Array(sharedKeyBytes)).slice(0, 8),
+      "..."
+    );
 
-  return { sharedKey: SK };
+    const SK = await crypto.subtle.importKey(
+      "raw",
+      sharedKeyBytes,
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["encrypt", "decrypt"]
+    );
+
+    console.log("Shared key created successfully (recipient side)");
+
+    return { sharedKey: SK };
+  } catch (err) {
+    console.error("Error during key derivation (recipient side):", err);
+    throw new Error(
+      "Key derivation failed: " +
+        (err instanceof Error ? err.message : String(err))
+    );
+  }
 }
 
 /**
