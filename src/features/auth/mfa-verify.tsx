@@ -76,7 +76,7 @@ export default function MfaPage() {
           placeholder="000 000"
           onChange={(e) => setOtp(e.target.value)}
           disabled={verifyingMfa}
-          type="number"
+          type="text"
           inputMode="numeric"
           autoComplete="one-time-code"
           autoFocus

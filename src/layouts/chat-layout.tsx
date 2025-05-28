@@ -173,8 +173,10 @@ export default function ChatLayout() {
               <DropdownMenuContent>
                 <DropdownMenuLabel>Settings</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Link to="/mfa/setup">Setup MFA</Link>
+                <DropdownMenuItem className="cursor-pointer p-0">
+                  <Link to="/mfa/setup" className="w-full h-full p-2">
+                    Setup MFA
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="cursor-pointer"
