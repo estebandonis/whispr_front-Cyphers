@@ -500,31 +500,22 @@ export default function Chat() {
       } else {
         console.error("WebSocket not connected, cannot send message");
         // Optionally fall back to HTTP API
-        // await sendMessage({...});
         return;
       }
 
-      // Send the message to the server
-      // await sendMessage({
-      //   conversationId: conversationKeysRef.current.convId,
-      //   message: message, // Plain text for local storage only
-      //   encryptedContent: JSON.stringify(secureMessage),
-      //   senderId: currentUser?.id?.toString() || "", // Use current user ID
-      // });
-
       // Add the message to the local chat
-      const newMessage: Message = {
-        id: Date.now(),
-        sender: currentUser?.name || "You",
-        text: message,
-        time: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        isMine: true,
-      };
+      // const newMessage: Message = {
+      //   id: Date.now(),
+      //   sender: currentUser?.name || "You",
+      //   text: message,
+      //   time: new Date().toLocaleTimeString([], {
+      //     hour: "2-digit",
+      //     minute: "2-digit",
+      //   }),
+      //   isMine: true,
+      // };
 
-      setChatMessages((prev) => [...prev, newMessage]);
+      // setChatMessages((prev) => [...prev, newMessage]);
       setMessage("");
 
       return secureMessage;
@@ -553,18 +544,6 @@ export default function Chat() {
 
       // Import the recipient's public signing key if it's in JWK format
       const verificationKey: CryptoKey = conversationKeysRef.current.signKeyPair.publicKey;
-      // if (typeof conversationKeysRef.current.signKeyPair.publicKey === "object") {
-      //   verificationKey = await window.crypto.subtle.importKey(
-      //     "jwk",
-      //     conversationKeysRef.current.theirSignPubKey,
-      //     { name: "ECDSA", namedCurve: "P-256" },
-      //     true,
-      //     ["verify"]
-      //   );
-      // } else {
-      //   verificationKey = conversationKeysRef.current
-      //     .signKeyPair.publicKey as unknown as CryptoKey;
-      // }
 
       // Process and verify the secure message
       const { message: decryptedText, isAuthentic } =
@@ -581,7 +560,7 @@ export default function Chat() {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        isMine: false,
+        isMine: +secureMessage.senderId === currentUser?.id ? true: false,
         isAuthentic,
       };
 
