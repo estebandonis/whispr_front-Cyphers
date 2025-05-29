@@ -9,23 +9,17 @@ import {
   getConversationWithUser,
   loadConversationKeys,
   saveConversationKeys,
-  updateConversationWithTheirKey,
 } from "@/lib/conversation-store";
 import {
-  decryptMessage,
   prepareSecureMessage,
   processSecureMessage,
 } from "@/lib/message-crypto";
-import { getCurrentUserId } from "@/lib/utils";
-import api from "@/lib/api";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { useCurrentUser } from "@/features/user/queries";
-import { hc } from "hono/client";
 import {
   useGetUserKeyBundle,
   useInitiateConversation,
-  useSendMessage,
   useGetPendingConversations,
   useAcceptConversation,
 } from "./queries";
@@ -61,7 +55,6 @@ export default function Chat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isInitializingConversation, setIsInitializingConversation] =
     useState(false);
-  const [messageToSend, setMessageToSend] = useState();
 
   // Refs to store cryptographic keys
   const conversationKeysRef = useRef<{
@@ -69,6 +62,7 @@ export default function Chat() {
     symKey: CryptoKey;
     signKeyPair: CryptoKeyPair;
     theirSignPubKey?: JsonWebKey;
+    type: "GROUP" | "DIRECT";
   } | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -97,6 +91,8 @@ export default function Chat() {
         // Check if we have an existing conversation with this user
         const existingConvId = getConversationWithUser(userId);
 
+        console.log("Pending conversations:", pendingConversations);
+
         if (existingConvId) {
           console.log(`Found existing conversation: ${existingConvId}`);
           // Load conversation keys
@@ -109,6 +105,7 @@ export default function Chat() {
               symKey: keys.symKey,
               signKeyPair: keys.signKeyPair,
               theirSignPubKey: keys.theirSignPubKey,
+              type: "DIRECT"
             };
 
             setConversationId(existingConvId);
@@ -123,7 +120,8 @@ export default function Chat() {
           // Find a pending conversation with this user
           const pendingConvo = pendingConversations.find(
             (convo: PendingConversation) =>
-              convo.initiatorId.toString() === userId
+              convo.initiatorId.toString() === userId ||
+              convo.initiatorId.toString() === currentUser?.id?.toString()
           );
 
           if (pendingConvo) {
@@ -164,13 +162,13 @@ export default function Chat() {
         console.log("WebSocket connection opened");
       });
 
-      ws.addEventListener("message", (event) => {
+      ws.addEventListener("message", async (event) => {
         console.log("Received message: ", event.data);
         try {
           const data = JSON.parse(event.data);
           if (data.type === "message" && data.encryptedContent) {
             // Process the received encrypted message
-            processReceivedMessage(data.encryptedContent);
+            await processReceivedMessage(data.encryptedContent);
           }
         } catch (error) {
           console.error("Error parsing WebSocket message:", error);
@@ -298,6 +296,11 @@ export default function Chat() {
         ["verify"] // Public key can only be used for verification
       );
 
+      const exportedSignPub = await window.crypto.subtle.exportKey(
+        "jwk",
+        importedSignPubKey
+      );
+
       const importedSignPrivKey = await window.crypto.subtle.importKey(
         "jwk",
         convSignPriv,
@@ -339,7 +342,8 @@ export default function Chat() {
           privateKey: importedSignPrivKey,
           publicKey: importedSignPubKey,
         },
-        theirSignPubKey: convSignPub,
+        theirSignPubKey: exportedSignPub,
+        type: "DIRECT"
       };
 
       setConversationId(pendingConvo.id.toString());
@@ -453,6 +457,7 @@ export default function Chat() {
         symKey: convSymKey,
         signKeyPair: convSignKeyPair,
         theirSignPubKey: exportedSignPub,
+        type: "DIRECT",
       };
 
       setConversationId(initiationResponse);
@@ -547,19 +552,19 @@ export default function Chat() {
       const secureMessage = JSON.parse(encryptedContent);
 
       // Import the recipient's public signing key if it's in JWK format
-      let verificationKey: CryptoKey;
-      if (typeof conversationKeysRef.current.theirSignPubKey === "object") {
-        verificationKey = await window.crypto.subtle.importKey(
-          "jwk",
-          conversationKeysRef.current.theirSignPubKey,
-          { name: "ECDSA", namedCurve: "P-256" },
-          true,
-          ["verify"]
-        );
-      } else {
-        verificationKey = conversationKeysRef.current
-          .theirSignPubKey as unknown as CryptoKey;
-      }
+      const verificationKey: CryptoKey = conversationKeysRef.current.signKeyPair.publicKey;
+      // if (typeof conversationKeysRef.current.signKeyPair.publicKey === "object") {
+      //   verificationKey = await window.crypto.subtle.importKey(
+      //     "jwk",
+      //     conversationKeysRef.current.theirSignPubKey,
+      //     { name: "ECDSA", namedCurve: "P-256" },
+      //     true,
+      //     ["verify"]
+      //   );
+      // } else {
+      //   verificationKey = conversationKeysRef.current
+      //     .signKeyPair.publicKey as unknown as CryptoKey;
+      // }
 
       // Process and verify the secure message
       const { message: decryptedText, isAuthentic } =
@@ -611,9 +616,9 @@ export default function Chat() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {chatMessages.map((msg) => (
+        {chatMessages.map((msg, index) => (
           <div
-            key={msg.id}
+            key={index}
             className={`flex relative ${
               msg.isMine ? "justify-end" : "justify-start"
             }`}

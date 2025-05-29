@@ -21,7 +21,8 @@ export async function saveConversationKeys(
   symKey: CryptoKey,
   signKeyPair: CryptoKeyPair,
   theirSignPubKey?: JsonWebKey,
-  initiator: boolean = true
+  initiator: boolean = true,
+  type: "GROUP" | "DIRECT" = "DIRECT"
 ): Promise<number> {
 
   // Export keys for storage
@@ -47,6 +48,7 @@ export async function saveConversationKeys(
     theirSignPubKey,
     initiator,
     createdAt: Date.now(),
+    type: type
   };
 
   // Get existing conversations or initialize empty object
