@@ -442,7 +442,9 @@ export default function Chat() {
         Number(initiationResponse.conversationId),
         userId,
         convSymKey,
-        convSignKeyPair
+        convSignKeyPair,
+        exportedSignPub,
+        true
       );
 
       // Store keys in ref for later use
@@ -450,6 +452,7 @@ export default function Chat() {
         convId: Number(initiationResponse),
         symKey: convSymKey,
         signKeyPair: convSignKeyPair,
+        theirSignPubKey: exportedSignPub,
       };
 
       setConversationId(initiationResponse);
