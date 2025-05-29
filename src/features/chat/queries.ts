@@ -66,6 +66,33 @@ export const useInitiateConversation = () => {
   });
 };
 
+export const useInitiateGroupConversation = () => {
+  return useMutation({
+    mutationFn: async ({
+      name,
+      members,
+    }: {
+      name: string;
+      members: {
+        id: number;
+        payload: {
+          iv: number[];
+          ciphertext: number[];
+          ephemeralKeyPublicJWK: any;
+          usedOPKId?: string | number;
+          initiatorId: string;
+        }
+      }[];
+    }) => {
+      const { data } = await api.post(`/conversations/group`, {
+        name: name,
+        members: members,
+      });
+      return data;
+    },
+  });
+};
+
 // Send a message in an existing conversation
 export const useSendMessage = () => {
   return useMutation({

@@ -47,7 +47,8 @@ interface PendingConversation {
 }
 
 export default function Chat() {
-  const { id: userId } = useParams<{ id: string }>();
+  const { id: userId, group } = useParams<{ id: string; group?: string }>();
+  const isGroup = group === 'true';
   const { data: currentUser } = useCurrentUser();
   const [message, setMessage] = useState("");
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
@@ -503,19 +504,6 @@ export default function Chat() {
         return;
       }
 
-      // Add the message to the local chat
-      // const newMessage: Message = {
-      //   id: Date.now(),
-      //   sender: currentUser?.name || "You",
-      //   text: message,
-      //   time: new Date().toLocaleTimeString([], {
-      //     hour: "2-digit",
-      //     minute: "2-digit",
-      //   }),
-      //   isMine: true,
-      // };
-
-      // setChatMessages((prev) => [...prev, newMessage]);
       setMessage("");
 
       return secureMessage;
@@ -561,7 +549,7 @@ export default function Chat() {
           minute: "2-digit",
         }),
         isMine: +secureMessage.senderId === currentUser?.id ? true: false,
-        isAuthentic,
+        isAuthentic: +secureMessage.senderId === currentUser?.id ? undefined : isAuthentic,
       };
 
       setChatMessages((prev) => [...prev, newMessage]);

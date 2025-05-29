@@ -52,6 +52,10 @@ export default function ChatLayout() {
     },
   ];
 
+  const createGroupChat = async () => {
+    
+  }
+
   if (!users) {
     return <Loading />;
   }
@@ -121,26 +125,36 @@ export default function ChatLayout() {
               Group Chats
             </h2>
             <div className="flex flex-col ">
-              {groupChats.map((group) => (
-                <div
-                  key={group.id}
-                  className="flex items-center relative group  p-2  hover:bg-neutral-800 cursor-pointer transition-colors duration-150 "
-                >
-                  <CornerAccents className="opacity-0  group-hover:opacity-100 transition-all duration-300 " />
-                  <div className="flex-1 py-1 flex flex-col min-w-0 gap-1">
-                    <div className="flex justify-between items-baseline">
-                      <p className="text-sm font-normal font-heading text-neutral-200 truncate">
-                        {group.name}
-                      </p>
-                      <p className="text-xs text-neutral-500">{group.time}</p>
+              {groupChats.map((group, index) => (
+                <NavLink
+                    key={index}
+                    to={`/chat/${group.id}/${true}`}
+                    className={({ isActive }) =>
+                      cn(
+                        "flex items-center relative group gap-3 p-2  hover:bg-neutral-800 cursor-pointer transition-colors duration-150",
+                        isActive && "bg-neutral-800"
+                      )
+                    }
+                  >
+                  {({ isActive }) => (
+                    <>
+                      <CornerAccents className={`group-hover:opacity-100 transition-all duration-300 ${isActive ? "opacity-100" : "opacity-0"}`} />
+                        <div className="flex-1 py-1 flex flex-col min-w-0 gap-1">
+                          <div className="flex justify-between items-baseline">
+                            <p className="text-sm font-normal font-heading text-neutral-200 truncate">
+                              {group.name}
+                            </p>
+                            <p className="text-xs text-neutral-500">{group.time}</p>
+                          </div>
+                        <div className="flex justify-between items-center">
+                        <p className="text-xs text-neutral-400 truncate">
+                          {group.lastMessage}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <p className="text-xs text-neutral-400 truncate">
-                        {group.lastMessage}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                  </>
+                  )}
+              </NavLink>
               ))}
             </div>
           </div>
