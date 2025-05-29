@@ -210,8 +210,8 @@ export default function Chat() {
 
       // 2. Extract data from the pending conversation
       const { ephemeralKeyPublicJWK, iv, ciphertext, usedOPKId } =
-        pendingConvo.initialPayload;
-
+      pendingConvo.initialPayload;
+      
       // 3. Derive the shared secret using X3DH (recipient side)
       console.log("usedOPKId:", usedOPKId);
       console.log("ephemeralKeyPublicJWK:", ephemeralKeyPublicJWK);
@@ -460,7 +460,7 @@ export default function Chat() {
         type: "DIRECT",
       };
 
-      setConversationId(initiationResponse);
+      setConversationId(initiationResponse.conversationId);
       setIsSessionEstablished(true);
       console.log("New conversation initialized successfully with ID:", convId);
     } catch (error) {
