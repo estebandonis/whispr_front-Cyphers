@@ -7,6 +7,7 @@ import {
 } from "@/lib/crypto";
 import {
   getConversationWithUser,
+  getConversationWithConvId,
   loadConversationKeys,
   saveConversationKeys,
 } from "@/lib/conversation-store";
@@ -44,11 +45,11 @@ interface PendingConversation {
     usedOPKId?: string | number;
   };
   initiatorIdentityKey?: any;
+  type: "DIRECT" | "GROUP";
 }
 
 export default function Chat() {
   const { id: userId, group } = useParams<{ id: string; group?: string }>();
-  const isGroup = group === 'true';
   const { data: currentUser } = useCurrentUser();
   const [message, setMessage] = useState("");
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
@@ -71,8 +72,9 @@ export default function Chat() {
   // React Query hooks
   const { data: keyBundle, isLoading: isLoadingKeyBundle } =
     useGetUserKeyBundle(userId || "", {
-      enabled: !!userId && !conversationId && !isInitializingConversation,
+      enabled: !!userId && !conversationId && !isInitializingConversation && group !== "true",
     });
+
   const { mutateAsync: initiateConversation } = useInitiateConversation();
   // const { mutateAsync: sendMessage } = useSendMessage();
 
@@ -90,7 +92,13 @@ export default function Chat() {
     const checkExistingConversation = async () => {
       try {
         // Check if we have an existing conversation with this user
-        const existingConvId = getConversationWithUser(userId);
+        let existingConvId = getConversationWithUser(userId);
+        console.log("Existing conversation ID:", existingConvId);
+
+        if (!existingConvId){
+          existingConvId = getConversationWithConvId(+userId);
+          console.log("Existing conversation ID from convId:", existingConvId);
+        }
 
         console.log("Pending conversations:", pendingConversations);
 
@@ -106,7 +114,7 @@ export default function Chat() {
               symKey: keys.symKey,
               signKeyPair: keys.signKeyPair,
               theirSignPubKey: keys.theirSignPubKey,
-              type: "DIRECT"
+              type: keys.type || "DIRECT", // Default to DIRECT if type is not set
             };
 
             setConversationId(existingConvId);
@@ -122,7 +130,8 @@ export default function Chat() {
           const pendingConvo = pendingConversations.find(
             (convo: PendingConversation) =>
               convo.initiatorId.toString() === userId ||
-              convo.initiatorId.toString() === currentUser?.id?.toString()
+              convo.initiatorId.toString() === currentUser?.id?.toString() ||
+              convo.id.toString() === userId
           );
 
           if (pendingConvo) {
@@ -138,7 +147,7 @@ export default function Chat() {
           }
         }
         // If no pending conversations at all, but we have keyBundle, initiate new
-        else if (keyBundle && !isInitializingConversation) {
+        else if (keyBundle && !isInitializingConversation && group !== "true") {
           console.log("No existing conversation, initializing new one");
           await initializeNewConversation();
         }
@@ -332,7 +341,8 @@ export default function Chat() {
           publicKey: importedSignPubKey,
         },
         pendingConvo.initiatorIdentityKey, // Store initiator's signing key
-        false // We're not the initiator
+        false, // We're not the initiator
+        pendingConvo.type
       );
 
       // 11. Update local state
@@ -344,7 +354,7 @@ export default function Chat() {
           publicKey: importedSignPubKey,
         },
         theirSignPubKey: exportedSignPub,
-        type: "DIRECT"
+        type: pendingConvo.type,
       };
 
       setConversationId(pendingConvo.id.toString());
@@ -360,7 +370,6 @@ export default function Chat() {
   // Initialize a new conversation using X3DH
   const initializeNewConversation = async () => {
     if (!userId || !keyBundle || isInitializingConversation) return;
-
     try {
       setIsInitializingConversation(true);
       console.log("Initializing new conversation with user:", userId);

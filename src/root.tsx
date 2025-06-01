@@ -47,7 +47,7 @@ createRoot(document.getElementById("root")!).render(
                 </ProtectedRoute>
               }
             >
-              <Route path="/chat/:id" element={<Chat />} />
+              <Route path="/chat/:id/:group" element={<Chat />} />
             </Route>
           </Route>
           <Route path="*" element={<h1>Not Found</h1>} />

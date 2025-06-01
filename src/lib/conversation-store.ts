@@ -8,6 +8,7 @@ export interface ConversationKeys {
   theirSignPubKey?: JsonWebKey;
   initiator: boolean;
   createdAt: number;
+  type: "GROUP" | "DIRECT";
 }
 
 const STORAGE_KEY = "whispr_conversations";
@@ -76,6 +77,25 @@ export function getConversationWithUser(userId: string): string | null {
   // Find conversation with this user
   const convEntry = Object.values(conversations).find(
     (conv: any) => conv.userId === userId
+  );
+
+  return convEntry ? (convEntry as any).convId : null;
+}
+
+/**
+ * Check if we have an existing conversation with a user
+ */
+export function getConversationWithConvId(convId: number): string | null {
+  const storedData = localStorage.getItem(STORAGE_KEY);
+  if (!storedData) return null;
+
+  const conversations = JSON.parse(storedData);
+
+  console.log("Conversations:", conversations);
+
+  // Find conversation with this user
+  const convEntry = Object.values(conversations).find(
+    (conv: any) => conv.convId === convId
   );
 
   return convEntry ? (convEntry as any).convId : null;

@@ -14,46 +14,168 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Loading from "@/features/loading";
 import MfaResetDialog from "@/components/mfa-reset-dialog";
+import CreateGroupModal from "@/components/create-group-chat";
 import { useState } from "react";
+import {
+  initializeX3DHSession,
+} from "@/lib/crypto";
+import {
+  useInitiateGroupConversation,
+  useGetGroupConversations
+} from "../features/chat/queries";
+import {
+  saveConversationKeys,
+} from "@/lib/conversation-store";
+import { useQueryClient } from '@tanstack/react-query';
+import api from '@/lib/api';
 
 export default function ChatLayout() {
   const { data: users } = useListUsers();
   const { data: currentUser } = useCurrentUser();
+  const { mutateAsync: initiateGroupConversation } = useInitiateGroupConversation();
+  const { data: groupChats } = useGetGroupConversations();
+  const queryClient = useQueryClient();
 
   const [mfaResetDialog, setMfaResetDialog] = useState<boolean>(false);
-
-  const groupChats = [
-    {
-      id: 1,
-      name: "Project Alpha",
-      lastMessage: "Alex: I've updated the designs",
-      avatar: "/groups/alpha.jpg",
-      time: "3:45 PM",
-      unread: 7,
-      members: 5,
-    },
-    {
-      id: 2,
-      name: "Design Team",
-      lastMessage: "Sarah: Check out this new tool",
-      avatar: "/groups/design.jpg",
-      time: "11:30 AM",
-      unread: 0,
-      members: 8,
-    },
-    {
-      id: 3,
-      name: "Weekend Plans",
-      lastMessage: "Emily: Who's free on Saturday?",
-      avatar: "/groups/weekend.jpg",
-      time: "Yesterday",
-      unread: 2,
-      members: 4,
-    },
-  ];
+  const [createGroupModal, setCreateGroupModal] = useState<boolean>(false); // Add this state
 
   const createGroupChat = async () => {
-    
+    setCreateGroupModal(true); // Open the modal instead of empty function
+  };
+
+  // const groupChats = [
+  //   {
+  //     id: 1,
+  //     name: "Project Alpha",
+  //     lastMessage: "Alex: I've updated the designs",
+  //     avatar: "/groups/alpha.jpg",
+  //     time: "3:45 PM",
+  //     unread: 7,
+  //     members: 5,
+  //   },
+  //   {
+  //     id: 2,
+  //     name: "Design Team",
+  //     lastMessage: "Sarah: Check out this new tool",
+  //     avatar: "/groups/design.jpg",
+  //     time: "11:30 AM",
+  //     unread: 0,
+  //     members: 8,
+  //   },
+  //   {
+  //     id: 3,
+  //     name: "Weekend Plans",
+  //     lastMessage: "Emily: Who's free on Saturday?",
+  //     avatar: "/groups/weekend.jpg",
+  //     time: "Yesterday",
+  //     unread: 2,
+  //     members: 4,
+  //   },
+  // ];
+
+  const handleCreateGroupChat = async (name: string, userIds: number[]) => {
+    const members = []
+
+    const convSymKey = await window.crypto.subtle.generateKey(
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["encrypt", "decrypt"]
+    );
+
+    // - Asymmetric key pair for message signing
+    const convSignKeyPair = await window.crypto.subtle.generateKey(
+      { name: "ECDSA", namedCurve: "P-256" },
+      true,
+      ["sign", "verify"]
+    );
+
+    // Step 3: Export the public signing key to send to the recipient
+    const exportedSignPub = await window.crypto.subtle.exportKey(
+      "jwk",
+      convSignKeyPair.publicKey
+    );
+
+    const exportedSignPriv = await window.crypto.subtle.exportKey(
+      "jwk",
+      convSignKeyPair.privateKey
+    );
+
+    const exportedSymKey = await window.crypto.subtle.exportKey(
+      "raw",
+      convSymKey
+    );
+
+    // Step 4: Prepare initial key message
+    const symKeyArray = Array.from(new Uint8Array(exportedSymKey));
+    console.log(
+      "Exporting symKey as array, length:",
+      symKeyArray.length,
+      "first 8 bytes:",
+      symKeyArray.slice(0, 8)
+    );
+
+    const keyMessage = {
+      convSignPub: exportedSignPub,
+      convSignPriv: exportedSignPriv,
+      convSymKey: symKeyArray, // Convert ArrayBuffer to array for JSON
+      initiatorId: currentUser?.id?.toString() || "", // Use current user ID
+    };
+
+    for (const userId of userIds) {
+      const userBundle = await queryClient.fetchQuery({
+            queryKey: ['userKeyBundle', userId.toString()],
+            queryFn: async () => {
+              const { data } = await api.get(`/user/${userId}/keybundle`);
+              return data;
+            },
+            staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+          });
+
+      if (!userBundle) {
+        console.error(`User key bundle not found for user ID: ${userId}`);
+        continue; // Skip this user if their key bundle is not available
+      }
+
+      const { sharedKey, ephemeralKeyPublicJWK, usedOPKId, initiatorIKPubJWK } = await initializeX3DHSession(userBundle);
+
+      // Step 5: Encrypt the key message with the shared secret from X3DH
+      const encoded = new TextEncoder().encode(JSON.stringify(keyMessage));
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      const encrypted = await window.crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        sharedKey,
+        encoded
+      );
+
+      members.push({
+        id: userId,
+        payload: {
+          iv: Array.from(iv),
+          ciphertext: Array.from(new Uint8Array(encrypted)),
+          ephemeralKeyPublicJWK,
+          usedOPKId,
+          initiatorId: currentUser?.id?.toString() || "", // Use current user ID
+        },
+      });
+    }
+
+    const initiationResponse = await initiateGroupConversation({
+      name: name,
+      members: members,
+    });
+
+    // Step 7: Save the conversation keys locally
+    const convId = await saveConversationKeys(
+      Number(initiationResponse.conversationId),
+      initiationResponse.initiatorId,
+      convSymKey,
+      convSignKeyPair,
+      exportedSignPub,
+      true,
+      "GROUP"
+    );
+
+    console.log("Group chat created with ID:", convId);
   }
 
   if (!users) {
@@ -82,7 +204,7 @@ export default function ChatLayout() {
                 .map((user) => (
                   <NavLink
                     key={user.id}
-                    to={`/chat/${user.id}`}
+                    to={`/chat/${user.id}/${"false"}`}
                     className={({ isActive }) =>
                       cn(
                         "flex items-center relative group gap-3 p-2  hover:bg-neutral-800 cursor-pointer transition-colors duration-150",
@@ -125,10 +247,10 @@ export default function ChatLayout() {
               Group Chats
             </h2>
             <div className="flex flex-col ">
-              {groupChats.map((group, index) => (
+              {(groupChats && groupChats.length > 0)  && groupChats.map((group, index) => (
                 <NavLink
                     key={index}
-                    to={`/chat/${group.id}/${true}`}
+                    to={`/chat/${group.id}/${"true"}`}
                     className={({ isActive }) =>
                       cn(
                         "flex items-center relative group gap-3 p-2  hover:bg-neutral-800 cursor-pointer transition-colors duration-150",
@@ -144,11 +266,11 @@ export default function ChatLayout() {
                             <p className="text-sm font-normal font-heading text-neutral-200 truncate">
                               {group.name}
                             </p>
-                            <p className="text-xs text-neutral-500">{group.time}</p>
+                            <p className="text-xs text-neutral-500">{100}</p>
                           </div>
                         <div className="flex justify-between items-center">
                         <p className="text-xs text-neutral-400 truncate">
-                          {group.lastMessage}
+                          {""}
                         </p>
                       </div>
                     </div>
@@ -156,6 +278,15 @@ export default function ChatLayout() {
                   )}
               </NavLink>
               ))}
+              <button
+                onClick={createGroupChat}
+                className="flex items-center gap-2 p-2 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded transition-colors duration-150"
+              >
+                <SettingsIcon className="size-4" />
+                <span className="text-sm font-normal font-heading">
+                  Create Group Chat
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -216,6 +347,11 @@ export default function ChatLayout() {
       </main>
 
       <MfaResetDialog open={mfaResetDialog} onOpenChange={setMfaResetDialog} />
+      <CreateGroupModal
+        open={createGroupModal}
+        onOpenChange={setCreateGroupModal}
+        onCreateGroup={handleCreateGroupChat}
+      />
     </div>
   );
 }

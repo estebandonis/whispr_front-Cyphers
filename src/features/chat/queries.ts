@@ -23,7 +23,7 @@ export const useListUsers = () => {
 // Fetch a user's key bundle
 export const useGetUserKeyBundle = (
   userId: string,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean, disabled?: boolean }
 ) => {
   return useQuery({
     queryKey: ["keyBundle", userId],
@@ -90,6 +90,17 @@ export const useInitiateGroupConversation = () => {
       });
       return data;
     },
+  });
+};
+
+export const useGetGroupConversations = () => {
+  return useQuery({
+    queryKey: ["groupConversations"],
+    queryFn: async () => {
+      const { data } = await api.get(`/conversations/group`);
+      return data;
+    },
+    enabled: true, // Always enabled to fetch group conversations
   });
 };
 
