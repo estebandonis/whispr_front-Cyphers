@@ -122,9 +122,6 @@ export default function CreateGroupModal({
                       <p className="text-sm font-medium text-neutral-200 truncate">
                         {user.name}
                       </p>
-                      <p className="text-xs text-neutral-400 truncate">
-                        {user.username}
-                      </p>
                     </div>
                   </div>
                 ))

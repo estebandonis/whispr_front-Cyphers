@@ -94,7 +94,6 @@ export default function Chat() {
     const processMessages = async () => {
       try {
         await refetchMessages();
-        console.log("Processing messages for conversation:", messages);
 
         if (messages && conversationKeysRef.current) {
           const { symKey, signKeyPair } = conversationKeysRef.current;
@@ -226,7 +225,6 @@ export default function Chat() {
       });
 
       ws.addEventListener("message", async (event) => {
-        console.log("Received message: ", event.data);
         try {
           const data = JSON.parse(event.data);
           if (data.type === "message" && data.encryptedContent) {
@@ -284,7 +282,7 @@ export default function Chat() {
 
       const { sharedKey } = await completeX3DHRecipient(
         ephemeralKeyPublicJWK,
-        pendingConvo.initiatorIdentityKey || {}, // Provide a default empty object if not available
+        // pendingConvo.initiatorIdentityKey || {}, // Provide a default empty object if not available
         myKeys as any, // Use type assertion to avoid complex type issues
         usedOPKId
       );
@@ -315,7 +313,7 @@ export default function Chat() {
       // 5. Parse the decrypted message
       const keyMessage = JSON.parse(new TextDecoder().decode(decrypted));
       console.log("Decrypted keyMessage:", keyMessage);
-      const { convSignPub, convSignPriv, convSymKey, initiatorId } = keyMessage;
+      const { convSignPub, convSignPriv, convSymKey } = keyMessage;
 
       // 6. Generate our own signing key pair for this conversation
       const mySignKeyPair = await window.crypto.subtle.generateKey(
@@ -387,7 +385,7 @@ export default function Chat() {
       });
 
       // 10. Save the conversation keys locally
-      const convId = await saveConversationKeys(
+      await saveConversationKeys(
         pendingConvo.id,
         pendingConvo.initiatorId.toString(),
         importedSymKey,
@@ -432,7 +430,7 @@ export default function Chat() {
 
       // Step 1: Run X3DH to establish a shared secret
       console.log("Key bundle for X3DH:", keyBundle);
-      const { sharedKey, ephemeralKeyPublicJWK, usedOPKId, initiatorIKPubJWK } =
+      const { sharedKey, ephemeralKeyPublicJWK, usedOPKId } =
         await initializeX3DHSession(keyBundle);
 
       // Step 2: Generate conversation-specific keys
@@ -594,7 +592,6 @@ export default function Chat() {
 
       // Parse the encrypted content
       const secureMessage = JSON.parse(message.encryptedContent);
-      console.log("Received secure message:", secureMessage);
 
       // Import the recipient's public signing key if it's in JWK format
       const verificationKey: CryptoKey = conversationKeysRef.current.signKeyPair.publicKey;

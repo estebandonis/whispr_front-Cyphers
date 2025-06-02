@@ -11,7 +11,6 @@ import {
 } from "jose";
 // Remove the hkdf import since we'll implement our own
 // import { hkdf } from "@panva/hkdf";
-import { Buffer } from "buffer";
 
 /**
  * X3DH Protocol implementation for secure communication
@@ -443,15 +442,15 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
   // DH4 = DH(EKa, OPKb) - if OPK is available
 
   // Attempting to import recipient's IK as ECDH for a simulation (if it works)
-  let recipientIKforDH = null;
-  try {
-    // Try to reimport IK as ECDH key (this may not work depending on the curve)
-    recipientIKforDH = await importJWK(ikJwk, "ECDH-ES");
-    console.log("Successfully imported IK as ECDH key");
-  } catch (err) {
-    console.log("Could not import IK as ECDH key:", err);
-    // Continue without this key
-  }
+  // let recipientIKforDH = null;
+  // try {
+  //   // Try to reimport IK as ECDH key (this may not work depending on the curve)
+  //   recipientIKforDH = await importJWK(ikJwk, "ECDH-ES");
+  //   console.log("Successfully imported IK as ECDH key");
+  // } catch (err) {
+  //   console.log("Could not import IK as ECDH key:", err);
+  //   // Continue without this key
+  // }
 
   // Initialize array to collect DH operations that succeed
   const dhResults: ArrayBuffer[] = [];
@@ -617,7 +616,7 @@ interface MyPrivateKeysType {
 
 export async function completeX3DHRecipient(
   initiatorEphemeralKeyJWK: any,
-  initiatorIKPubJWK: any,
+  // initiatorIKPubJWK: any,
   myPrivateKeys: MyPrivateKeysType, // Use the defined type
   usedOPKId?: string | number
 ) {

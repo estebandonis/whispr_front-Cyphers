@@ -137,7 +137,7 @@ export default function ChatLayout() {
         continue; // Skip this user if their key bundle is not available
       }
 
-      const { sharedKey, ephemeralKeyPublicJWK, usedOPKId, initiatorIKPubJWK } = await initializeX3DHSession(userBundle);
+      const { sharedKey, ephemeralKeyPublicJWK, usedOPKId } = await initializeX3DHSession(userBundle);
 
       // Step 5: Encrypt the key message with the shared secret from X3DH
       const encoded = new TextEncoder().encode(JSON.stringify(keyMessage));
@@ -240,14 +240,6 @@ export default function ChatLayout() {
                             <p className="text-sm font-normal font-heading text-neutral-200 truncate">
                               {user.name}
                             </p>
-                            <p className="text-xs text-neutral-500">
-                              {user.time}
-                            </p>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <p className="text-xs text-neutral-400 truncate">
-                              {user.username}
-                            </p>
                           </div>
                         </div>
                       </>
@@ -263,7 +255,7 @@ export default function ChatLayout() {
               Group Chats
             </h2>
             <div className="flex flex-col ">
-              {(groupChats && groupChats.length > 0)  && groupChats.map((group, index) => (
+              {(groupChats && groupChats.length > 0)  && groupChats.map((group: any, index: number) => (
                 <NavLink
                     key={index}
                     to={`/chat/${group.id}/${"true"}`}

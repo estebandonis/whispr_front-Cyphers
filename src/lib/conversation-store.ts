@@ -1,5 +1,3 @@
-import { v4 as uuidv4 } from "uuid";
-
 export interface ConversationKeys {
   convId: number;
   userId: string;
@@ -141,7 +139,7 @@ export async function loadConversationKeys(
   );
 
   return {
-    convId,
+    convId: Number(convId),
     userId: conv.userId,
     symKey,
     signKeyPair: {
@@ -151,6 +149,7 @@ export async function loadConversationKeys(
     theirSignPubKey: conv.theirSignPubKey,
     initiator: conv.initiator,
     createdAt: conv.createdAt,
+    type: conv.type,
   };
 }
 
