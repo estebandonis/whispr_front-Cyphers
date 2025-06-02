@@ -134,6 +134,7 @@ export default function Chat() {
   // Check for existing conversation or start a new one
   useEffect(() => {
     if (!userId) return;
+    setChatMessages([]); // Clear messages when userId changes
 
     const checkExistingConversation = async () => {
       try {
