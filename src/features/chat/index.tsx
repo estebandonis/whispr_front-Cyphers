@@ -214,7 +214,11 @@ export default function Chat() {
   useEffect(() => {
     if (isSessionEstablished && conversationId) {
       console.log("Connecting to WebSocket...");
-      const wsUrl = `ws://localhost:3000/message/ws/${conversationId}`;
+      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+      const isSecure = serverUrl.startsWith('https://');
+      const wsProtocol = isSecure ? 'wss://' : 'ws://';
+      const wsBaseUrl = serverUrl.replace(/^https?:\/\//, '');
+      const wsUrl = `${wsProtocol}${wsBaseUrl}/message/ws/${conversationId}`;
       const ws = new WebSocket(wsUrl);
 
       // Store WebSocket reference
