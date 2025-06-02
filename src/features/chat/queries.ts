@@ -179,3 +179,12 @@ export const useAcceptConversation = () => {
     },
   });
 };
+
+export const useDeleteUser = () => {
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await api.delete(`/user`);
+      return data;
+    },
+  }); 
+}

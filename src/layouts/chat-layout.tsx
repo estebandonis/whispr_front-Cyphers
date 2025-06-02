@@ -1,8 +1,8 @@
 import CornerAccents from "@/components/corner-accents";
-import { SettingsIcon, LogOut } from "lucide-react";
+import { SettingsIcon, LogOut, Delete } from "lucide-react";
 import { Outlet, NavLink, Link } from "react-router";
 import { cn, logout } from "@/lib/utils";
-import { useListUsers } from "@/features/chat/queries";
+import { useDeleteUser, useListUsers } from "@/features/chat/queries";
 import { useCurrentUser } from "@/features/user/queries";
 import {
   DropdownMenu,
@@ -34,6 +34,7 @@ export default function ChatLayout() {
   const { data: currentUser } = useCurrentUser();
   const { mutateAsync: initiateGroupConversation } = useInitiateGroupConversation();
   const { data: groupChats } = useGetGroupConversations();
+  const { mutateAsync: deleteUser, isSuccess: userDeleted } = useDeleteUser();
   const queryClient = useQueryClient();
 
   const [mfaResetDialog, setMfaResetDialog] = useState<boolean>(false);
@@ -176,6 +177,19 @@ export default function ChatLayout() {
     );
 
     console.log("Group chat created with ID:", convId);
+  }
+
+  const handleDeleteUser = async() => {
+    await deleteUser();
+
+    if (userDeleted) {
+      // Clear local storage and redirect to login
+      localStorage.clear();
+      queryClient.clear();
+
+      // Optionally, you can redirect to the login page
+      window.location.href = "/";
+    }
   }
 
   if (!users) {
@@ -337,6 +351,13 @@ export default function ChatLayout() {
               className="p-2 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded cursor-pointer"
             >
               <LogOut className="size-4" />
+            </button>
+            <button
+              onClick={handleDeleteUser}
+              type="button"
+              className="p-2 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded cursor-pointer"
+              >
+              <Delete className="size-4" />
             </button>
           </div>
         </div>

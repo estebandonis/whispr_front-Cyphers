@@ -222,6 +222,8 @@ export default function Chat() {
       const { ephemeralKeyPublicJWK, iv, ciphertext, usedOPKId } =
       pendingConvo.initialPayload;
       
+      console.log("initialPayload:", pendingConvo.initialPayload);
+
       // 3. Derive the shared secret using X3DH (recipient side)
       console.log("usedOPKId:", usedOPKId);
       console.log("ephemeralKeyPublicJWK:", ephemeralKeyPublicJWK);
