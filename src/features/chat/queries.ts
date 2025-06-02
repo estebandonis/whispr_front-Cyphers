@@ -132,12 +132,17 @@ export const useSendMessage = () => {
 };
 
 // Fetch messages for a conversation
-export const useGetConversationMessages = (conversationId: string) => {
+export const useGetConversationMessages = (conversationId: string, isDirectMessage: boolean) => {
   return useQuery({
-    queryKey: ["messages", conversationId],
+    queryKey: ["messages", conversationId, isDirectMessage],
     queryFn: async () => {
       const { data } = await api.get(
-        `/conversations/${conversationId}/messages`
+        `/conversations/${conversationId}/messages`,
+        {
+          params: {
+            isDirectMessage: isDirectMessage
+          }
+        }
       );
       return data;
     },

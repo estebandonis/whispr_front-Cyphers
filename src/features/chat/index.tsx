@@ -23,6 +23,7 @@ import {
   useInitiateConversation,
   useGetPendingConversations,
   useAcceptConversation,
+  useGetConversationMessages,
 } from "./queries";
 
 interface Message {
@@ -84,6 +85,51 @@ export default function Chat() {
       enabled: !conversationId && !isInitializingConversation,
     });
   const { mutateAsync: acceptConversation } = useAcceptConversation();
+
+  const { data: messages, refetch: refetchMessages } =
+    useGetConversationMessages(userId!, group !== "true");
+
+  useEffect(() => {
+
+    const processMessages = async () => {
+      await refetchMessages();
+      console.log("Processing messages for conversation:", messages);
+
+      if (messages && conversationKeysRef.current) {
+        const { symKey } = conversationKeysRef.current;
+
+        // Import the recipient's public signing key if it's in JWK format
+        const verificationKey: CryptoKey = conversationKeysRef.current!.signKeyPair.publicKey;
+        
+        const processedMessages: Message[] = [];
+        
+        for (const msg of messages) {
+          const content = await JSON.parse(msg.content)
+          const { message: decryptedText, isAuthentic } =
+          await processSecureMessage(content, symKey, verificationKey);
+
+          const newMessage: Message = {
+          id: msg.createdAt || Date.now(),
+          sender: msg.senderId,
+          text: decryptedText,
+          time: new Date(
+            msg.createAt || Date.now()
+          ).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          isMine: +msg.senderId === currentUser?.id ? true: false,
+          isAuthentic: +msg.senderId === currentUser?.id ? undefined : isAuthentic,
+        };
+
+        processedMessages.push(newMessage);
+      }
+      
+      setChatMessages(processedMessages);
+    }};
+
+    processMessages();
+  }, [messages, currentUser?.id]);
 
   // Check for existing conversation or start a new one
   useEffect(() => {
