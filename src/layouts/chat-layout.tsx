@@ -177,6 +177,8 @@ export default function ChatLayout() {
     );
 
     console.log("Group chat created with ID:", convId);
+
+    queryClient.invalidateQueries({ queryKey: ['groupConversations'] });
   }
 
   const handleDeleteUser = async() => {
