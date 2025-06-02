@@ -92,44 +92,50 @@ export default function Chat() {
   useEffect(() => {
 
     const processMessages = async () => {
-      await refetchMessages();
-      console.log("Processing messages for conversation:", messages);
+      try {
+        await refetchMessages();
+        console.log("Processing messages for conversation:", messages);
 
-      if (messages && conversationKeysRef.current) {
-        const { symKey } = conversationKeysRef.current;
+        if (messages && conversationKeysRef.current) {
+          const { symKey, signKeyPair } = conversationKeysRef.current;
 
-        // Import the recipient's public signing key if it's in JWK format
-        const verificationKey: CryptoKey = conversationKeysRef.current!.signKeyPair.publicKey;
+          // Import the recipient's public signing key if it's in JWK format
+          const verificationKey: CryptoKey = signKeyPair.publicKey;
+          
+          const processedMessages: Message[] = [];
+          
+          for (const msg of messages) {
+            const content = await JSON.parse(msg.content)
+            const { message: decryptedText, isAuthentic } =
+            await processSecureMessage(content, symKey, verificationKey);
+
+            const newMessage: Message = {
+            id: msg.createdAt || Date.now(),
+            sender: msg.senderName || msg.senderId.toString(),
+            text: decryptedText,
+            time: new Date(
+              msg.createAt || Date.now()
+            ).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            isMine: +msg.senderId === currentUser?.id ? true: false,
+            isAuthentic: +msg.senderId === currentUser?.id ? undefined : isAuthentic,
+          };
+
+          processedMessages.push(newMessage);
+        }
         
-        const processedMessages: Message[] = [];
-        
-        for (const msg of messages) {
-          const content = await JSON.parse(msg.content)
-          const { message: decryptedText, isAuthentic } =
-          await processSecureMessage(content, symKey, verificationKey);
-
-          const newMessage: Message = {
-          id: msg.createdAt || Date.now(),
-          sender: msg.senderId,
-          text: decryptedText,
-          time: new Date(
-            msg.createAt || Date.now()
-          ).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          isMine: +msg.senderId === currentUser?.id ? true: false,
-          isAuthentic: +msg.senderId === currentUser?.id ? undefined : isAuthentic,
-        };
-
-        processedMessages.push(newMessage);
+        setChatMessages(processedMessages);
+      }  
+      } catch (error) {
+        console.error("Error processing messages:", error);
+        return;
       }
-      
-      setChatMessages(processedMessages);
-    }};
+    };
 
     processMessages();
-  }, [messages, currentUser?.id]);
+  }, [messages, currentUser?.id, refetchMessages]);
 
   // Check for existing conversation or start a new one
   useEffect(() => {
@@ -225,7 +231,7 @@ export default function Chat() {
           const data = JSON.parse(event.data);
           if (data.type === "message" && data.encryptedContent) {
             // Process the received encrypted message
-            await processReceivedMessage(data.encryptedContent);
+            await processReceivedMessage(data);
           }
         } catch (error) {
           console.error("Error parsing WebSocket message:", error);
@@ -551,6 +557,7 @@ export default function Chat() {
           room: conversationId,
           encryptedContent: JSON.stringify(secureMessage),
           senderId: currentUser?.id?.toString() || "",
+          senderName: currentUser?.username || "Anonymous",
           timestamp: Date.now(),
         };
 
@@ -571,7 +578,7 @@ export default function Chat() {
   };
 
   // Helper to process received messages
-  const processReceivedMessage = async (encryptedContent: string) => {
+  const processReceivedMessage = async (message: any) => {
     if (
       !conversationKeysRef.current ||
       !conversationKeysRef.current.theirSignPubKey
@@ -586,7 +593,8 @@ export default function Chat() {
       const { symKey } = conversationKeysRef.current;
 
       // Parse the encrypted content
-      const secureMessage = JSON.parse(encryptedContent);
+      const secureMessage = JSON.parse(message.encryptedContent);
+      console.log("Received secure message:", secureMessage);
 
       // Import the recipient's public signing key if it's in JWK format
       const verificationKey: CryptoKey = conversationKeysRef.current.signKeyPair.publicKey;
@@ -597,8 +605,8 @@ export default function Chat() {
 
       // Add the decrypted message to the chat
       const newMessage: Message = {
-        id: secureMessage.timestamp || Date.now(),
-        sender: secureMessage.senderId,
+        id: message.timestamp || Date.now(),
+        sender: message.senderName,
         text: decryptedText,
         time: new Date(
           secureMessage.timestamp || Date.now()
@@ -606,8 +614,8 @@ export default function Chat() {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        isMine: +secureMessage.senderId === currentUser?.id ? true: false,
-        isAuthentic: +secureMessage.senderId === currentUser?.id ? undefined : isAuthentic,
+        isMine: +message.senderId === currentUser?.id ? true: false,
+        isAuthentic: +message.senderId === currentUser?.id ? undefined : isAuthentic,
       };
 
       setChatMessages((prev) => [...prev, newMessage]);
@@ -655,6 +663,12 @@ export default function Chat() {
                   : "bg-neutral-900 border border-neutral-800 text-neutral-300"
               }`}
             >
+              {!msg.isMine && (
+                <div>
+                  <p className="font-medium text-xs">{msg.sender}</p>
+                  <div className="border-t border-neutral-700 my-1" />
+                </div>
+              )}
               <p className="text-sm">{msg.text}</p>
               <div className="flex justify-between items-center mt-1">
                 <span className="text-xs text-neutral-500">
