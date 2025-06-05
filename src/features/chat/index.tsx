@@ -145,7 +145,7 @@ export default function Chat() {
       try {
         // Check if we have an existing conversation with this user
         let existingConvId = null;
-        if (group !== "true") {
+        if (group === "false") {
           existingConvId = getConversationWithUser(userId);
           console.log("Existing conversation ID:", existingConvId);
         } else {
