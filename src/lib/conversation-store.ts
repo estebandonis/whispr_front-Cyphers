@@ -74,7 +74,7 @@ export function getConversationWithUser(userId: string): string | null {
 
   // Find conversation with this user
   const convEntry = Object.values(conversations).find(
-    (conv: any) => conv.userId === userId
+    (conv: any) => conv.userId != null && conv.userId === userId && conv.type === "DIRECT"
   );
 
   return convEntry ? (convEntry as any).convId : null;
@@ -93,7 +93,7 @@ export function getConversationWithConvId(convId: number): string | null {
 
   // Find conversation with this user
   const convEntry = Object.values(conversations).find(
-    (conv: any) => conv.convId === convId
+    (conv: any) => conv.convId === convId && conv.type === "GROUP"
   );
 
   return convEntry ? (convEntry as any).convId : null;
