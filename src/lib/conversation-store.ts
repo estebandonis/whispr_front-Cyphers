@@ -16,12 +16,12 @@ const STORAGE_KEY = "whispr_conversations";
  */
 export async function saveConversationKeys(
   convId: number,
-  userId: string,
   symKey: CryptoKey,
   signKeyPair: CryptoKeyPair,
   theirSignPubKey?: JsonWebKey,
   initiator: boolean = true,
-  type: "GROUP" | "DIRECT" = "DIRECT"
+  type: "GROUP" | "DIRECT" = "DIRECT",
+  userId?: string,
 ): Promise<number> {
 
   // Export keys for storage
@@ -38,7 +38,6 @@ export async function saveConversationKeys(
   // Create conversation entry
   const conversation = {
     convId,
-    userId,
     symKey: exportedSymKey,
     signKeyPair: {
       privateKey: exportedSignPriv,
@@ -47,7 +46,8 @@ export async function saveConversationKeys(
     theirSignPubKey,
     initiator,
     createdAt: Date.now(),
-    type: type
+    type: type,
+    userId,
   };
 
   // Get existing conversations or initialize empty object

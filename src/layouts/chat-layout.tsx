@@ -168,7 +168,6 @@ export default function ChatLayout() {
     // Step 7: Save the conversation keys locally
     const convId = await saveConversationKeys(
       Number(initiationResponse.conversationId),
-      initiationResponse.initiatorId,
       convSymKey,
       convSignKeyPair,
       exportedSignPub,

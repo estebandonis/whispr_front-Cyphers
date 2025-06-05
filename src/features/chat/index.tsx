@@ -195,13 +195,13 @@ export default function Chat() {
             await processPendingConversation(pendingConvo);
           }
           // If no pending conversation with this specific user, but we have keyBundle, initiate new
-          else if (keyBundle && !isInitializingConversation) {
+          else if (keyBundle && !isInitializingConversation && group === "false") {
             console.log("No existing conversation, initializing new one");
             await initializeNewConversation();
           }
         }
         // If no pending conversations at all, but we have keyBundle, initiate new
-        else if (keyBundle && !isInitializingConversation && group !== "true") {
+        else if (keyBundle && !isInitializingConversation && group === "false") {
           console.log("No existing conversation, initializing new one");
           await initializeNewConversation();
         }
@@ -393,7 +393,6 @@ export default function Chat() {
       // 10. Save the conversation keys locally
       await saveConversationKeys(
         pendingConvo.id,
-        pendingConvo.initiatorId.toString(),
         importedSymKey,
         {
           privateKey: importedSignPrivKey,
@@ -401,7 +400,8 @@ export default function Chat() {
         },
         pendingConvo.initiatorIdentityKey, // Store initiator's signing key
         false, // We're not the initiator
-        pendingConvo.type
+        pendingConvo.type,
+        group === "false" ? pendingConvo.initiatorId.toString() : undefined,
       );
 
       // 11. Update local state
@@ -513,11 +513,12 @@ export default function Chat() {
       // Step 7: Save the conversation keys locally
       const convId = await saveConversationKeys(
         Number(initiationResponse.conversationId),
-        userId,
         convSymKey,
         convSignKeyPair,
         exportedSignPub,
-        true
+        true,
+        "DIRECT",
+        userId,
       );
 
       // Store keys in ref for later use
