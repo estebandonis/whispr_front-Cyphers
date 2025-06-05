@@ -376,7 +376,6 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
     throw new Error(`SPK signature verification failed: ${errorMessage}`);
   }
 
-  // Generate ephemeral key with extractable option
   const keyPairOptions: GenerateKeyPairOptions = {
     extractable: true,
   };
@@ -385,11 +384,9 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
     keyPairOptions
   );
 
-  // Handle different one-time pre-key formats
   let recipientOPK = null;
   let opkId: string | number | undefined;
 
-  // Check for oneTimePreKeys array (original format)
   if (
     recipientPublicBundle.oneTimePreKeys &&
     recipientPublicBundle.oneTimePreKeys.length > 0
@@ -428,68 +425,8 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
     recipientOPK = recipientOPKImport2;
   }
 
-  // MODIFIED ECDH KEY DERIVATIONS
-  console.log("🔐 Starting X3DH key exchange");
-
-  // In standard X3DH:
-  // DH1 = DH(IKa, SPKb) - We can't do this if IK is ES256 (signature only)
-  // DH2 = DH(EKa, IKb) - We can't do this if IKb is ES256 (signature only)
-  // DH3 = DH(EKa, SPKb) - We can do this (EKa and SPKb are ECDH-ES)
-  // DH4 = DH(EKa, OPKb) - We can do this (EKa and OPKb are ECDH-ES)
-
-  // For a simplified implementation, we'll use:
-  // DH3 = DH(EKa, SPKb)
-  // DH4 = DH(EKa, OPKb) - if OPK is available
-
-  // Attempting to import recipient's IK as ECDH for a simulation (if it works)
-  // let recipientIKforDH = null;
-  // try {
-  //   // Try to reimport IK as ECDH key (this may not work depending on the curve)
-  //   recipientIKforDH = await importJWK(ikJwk, "ECDH-ES");
-  //   console.log("Successfully imported IK as ECDH key");
-  // } catch (err) {
-  //   console.log("Could not import IK as ECDH key:", err);
-  //   // Continue without this key
-  // }
-
-  // Initialize array to collect DH operations that succeed
   const dhResults: ArrayBuffer[] = [];
 
-  // Attempt DH1 (if possible)
-  // if (recipientIKforDH) {
-  //   try {
-  //     // Note: We'll skip this because in most implementations IK is not ECDH-compatible
-  //     // const dh1 = await crypto.subtle.deriveBits(
-  //     //   { name: "ECDH", public: recipientSPK },
-  //     //   myKeys.ik_priv,
-  //     //   256
-  //     // );
-  //     // dhResults.push(dh1);
-  //     // console.log("DH1 complete");
-  //   } catch (err) {
-  //     console.error("DH1 failed:", err);
-  //     // Continue without this key
-  //   }
-  // }
-
-  // Attempt DH2 (if possible)
-  // if (recipientIKforDH) {
-  //   try {
-  //     // Note: We'll skip this because in most implementations IK is not ECDH-compatible
-  //     // const dh2 = await crypto.subtle.deriveBits(
-  //     //   { name: "ECDH", public: recipientIKforDH },
-  //     //   ek_priv,
-  //     //   256
-  //     // );
-  //     // dhResults.push(dh2);
-  //     // console.log("DH2 complete");
-  //   } catch (err) {
-  //     console.error("DH2 failed:", err);
-  //     // Continue without this key
-  //   }
-  // }
-
-  // Always do DH3 - this should work
   try {
     const dh3 = await crypto.subtle.deriveBits(
       { name: "ECDH", public: recipientSPK },
@@ -505,7 +442,6 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
     );
   }
 
-  // Attempt DH4 (if OPK is available)
   if (recipientOPK) {
     try {
       const dh4 = await crypto.subtle.deriveBits(
@@ -520,7 +456,6 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
     }
   }
 
-  // Make sure we have at least one successful DH operation
   if (dhResults.length === 0) {
     throw new Error("Could not complete any Diffie-Hellman operations");
   }
@@ -593,8 +528,7 @@ interface MyPrivateKeysType {
 
 export async function completeX3DHRecipient(
   initiatorEphemeralKeyJWK: any,
-  // initiatorIKPubJWK: any,
-  myPrivateKeys: MyPrivateKeysType, // Use the defined type
+  myPrivateKeys: MyPrivateKeysType,
   usedOPKId?: string | number
 ) {
   console.log("🔐 Processing X3DH recipient");
@@ -609,16 +543,8 @@ export async function completeX3DHRecipient(
   }
   const initiatorEKPub = initiatorEKPubImport;
 
-  // Note: We skip importing the identity key for ECDH since ES256 keys cannot be used for ECDH
-  // This matches the approach used in initializeX3DHSession
-
-  // Initialize array to collect DH operations that succeed
   const dhResults: ArrayBuffer[] = [];
 
-  // Skip DH1 and DH2 since they involve identity keys (ES256) which cannot be used for ECDH
-  // This is consistent with the initializeX3DHSession implementation
-
-  // DH3 = DH(EKa, SPKb) - Always do this, it should work
   try {
     const dh3 = await crypto.subtle.deriveBits(
       { name: "ECDH", public: initiatorEKPub },
@@ -626,7 +552,6 @@ export async function completeX3DHRecipient(
       256
     );
     dhResults.push(dh3);
-    console.log("🔄DH3 complete (recipient)");
   } catch (err) {
     console.error("❌ DH3 failed:", err);
     throw new Error(
@@ -635,10 +560,8 @@ export async function completeX3DHRecipient(
     );
   }
 
-  // DH4 = DH(EKa, OPKb) - Do this if OPK is available
   if (usedOPKId && myPrivateKeys.opks) {
     try {
-      // Find the OPK based on our client-assigned ID
       const usedOPKEntry = myPrivateKeys.opks.find((opk) => {
         return opk.id.toString() === usedOPKId.toString();
       });
