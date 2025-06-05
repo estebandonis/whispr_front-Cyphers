@@ -180,7 +180,8 @@ export default function Chat() {
           }
         }
         // Check if we're the recipient of a pending conversation with this user
-        else if (pendingConversations?.length) {
+        else if (pendingConversations && pendingConversations.length > 0) {
+          console.log("pending: ", pendingConversations.length, " conversations found");
           // Find a pending conversation with this user
           const pendingConvo = pendingConversations.find(
             (convo: PendingConversation) =>
@@ -196,13 +197,14 @@ export default function Chat() {
             await processPendingConversation(pendingConvo);
           }
           // If no pending conversation with this specific user, but we have keyBundle, initiate new
-          else if (keyBundle && !isInitializingConversation && group === "false") {
+          else if (keyBundle && !isInitializingConversation) {
             console.log("No existing conversation, initializing new one");
             await initializeNewConversation();
           }
         }
         // If no pending conversations at all, but we have keyBundle, initiate new
-        else if (keyBundle && !isInitializingConversation && group === "false") {
+        else if (keyBundle && !isInitializingConversation) {
+
           console.log("No existing conversation, initializing new one");
           await initializeNewConversation();
         }
