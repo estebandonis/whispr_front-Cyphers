@@ -73,7 +73,11 @@ export default function Chat() {
   // React Query hooks
   const { data: keyBundle, isLoading: isLoadingKeyBundle } =
     useGetUserKeyBundle(userId || "", {
-      enabled: !!userId && !conversationId && !isInitializingConversation && group !== "true",
+      enabled:
+        !!userId &&
+        !conversationId &&
+        !isInitializingConversation &&
+        group !== "true",
     });
 
   const { mutateAsync: initiateConversation } = useInitiateConversation();
@@ -89,8 +93,27 @@ export default function Chat() {
   const { data: messages, refetch: refetchMessages } =
     useGetConversationMessages(userId!, group !== "true");
 
-  useEffect(() => {
+  // Debug: Print relevant state on every render
+  const enabledKeyBundle =
+    !!userId &&
+    !conversationId &&
+    !isInitializingConversation &&
+    group !== "true";
+  console.log("[Chat Debug]", {
+    userId,
+    group,
+    conversationId,
+    isInitializingConversation,
+    enabledKeyBundle,
+  });
 
+  useEffect(() => {
+    setConversationId(null); // Reset conversationId when switching chats
+    setIsSessionEstablished(false); // Optionally reset session state
+    setChatMessages([]); // Clear messages
+  }, [userId, group]);
+
+  useEffect(() => {
     const processMessages = async () => {
       try {
         await refetchMessages();
@@ -100,33 +123,35 @@ export default function Chat() {
 
           // Import the recipient's public signing key if it's in JWK format
           const verificationKey: CryptoKey = signKeyPair.publicKey;
-          
+
           const processedMessages: Message[] = [];
-          
+
           for (const msg of messages) {
-            const content = await JSON.parse(msg.content)
+            const content = await JSON.parse(msg.content);
             const { message: decryptedText, isAuthentic } =
-            await processSecureMessage(content, symKey, verificationKey);
+              await processSecureMessage(content, symKey, verificationKey);
 
             const newMessage: Message = {
-            id: msg.createdAt || Date.now(),
-            sender: msg.senderName || msg.senderId.toString(),
-            text: decryptedText,
-            time: new Date(
-              msg.createAt || Date.now()
-            ).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            isMine: +msg.senderId === currentUser?.id ? true: false,
-            isAuthentic: +msg.senderId === currentUser?.id ? undefined : isAuthentic,
-          };
+              id: msg.createdAt || Date.now(),
+              sender: msg.senderName || msg.senderId.toString(),
+              text: decryptedText,
+              time: new Date(msg.createAt || Date.now()).toLocaleTimeString(
+                [],
+                {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }
+              ),
+              isMine: +msg.senderId === currentUser?.id ? true : false,
+              isAuthentic:
+                +msg.senderId === currentUser?.id ? undefined : isAuthentic,
+            };
 
-          processedMessages.push(newMessage);
+            processedMessages.push(newMessage);
+          }
+
+          setChatMessages(processedMessages);
         }
-        
-        setChatMessages(processedMessages);
-      }  
       } catch (error) {
         console.error("Error processing messages:", error);
         return;
@@ -145,7 +170,14 @@ export default function Chat() {
       try {
         // Check if we have an existing conversation with this user
         let existingConvId = null;
-        console.log("Group flag:", group, " group === 'false':", group === "false", " typeof group:", typeof group);
+        console.log(
+          "Group flag:",
+          group,
+          " group === 'false':",
+          group === "false",
+          " typeof group:",
+          typeof group
+        );
         console.log("User ID:", userId, " Type of userId:", typeof userId);
         if (group === "false") {
           existingConvId = getConversationWithUser(userId);
@@ -181,7 +213,11 @@ export default function Chat() {
         }
         // Check if we're the recipient of a pending conversation with this user
         else if (pendingConversations && pendingConversations.length > 0) {
-          console.log("pending: ", pendingConversations.length, " conversations found");
+          console.log(
+            "pending: ",
+            pendingConversations.length,
+            " conversations found"
+          );
           // Find a pending conversation with this user
           const pendingConvo = pendingConversations.find(
             (convo: PendingConversation) =>
@@ -204,7 +240,6 @@ export default function Chat() {
         }
         // If no pending conversations at all, but we have keyBundle, initiate new
         else if (keyBundle && !isInitializingConversation) {
-
           console.log("No existing conversation, initializing new one");
           await initializeNewConversation();
         }
@@ -219,10 +254,11 @@ export default function Chat() {
   useEffect(() => {
     if (isSessionEstablished && conversationId) {
       console.log("Connecting to WebSocket...");
-      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
-      const isSecure = serverUrl.startsWith('https://');
-      const wsProtocol = isSecure ? 'wss://' : 'ws://';
-      const wsBaseUrl = serverUrl.replace(/^https?:\/\//, '');
+      const serverUrl =
+        import.meta.env.VITE_SERVER_URL || "http://localhost:3000";
+      const isSecure = serverUrl.startsWith("https://");
+      const wsProtocol = isSecure ? "wss://" : "ws://";
+      const wsBaseUrl = serverUrl.replace(/^https?:\/\//, "");
       const wsUrl = `${wsProtocol}${wsBaseUrl}/message/ws/${conversationId}`;
       const ws = new WebSocket(wsUrl);
 
@@ -280,8 +316,8 @@ export default function Chat() {
 
       // 2. Extract data from the pending conversation
       const { ephemeralKeyPublicJWK, iv, ciphertext, usedOPKId } =
-      pendingConvo.initialPayload;
-      
+        pendingConvo.initialPayload;
+
       console.log("initialPayload:", pendingConvo.initialPayload);
 
       // 3. Derive the shared secret using X3DH (recipient side)
@@ -404,7 +440,7 @@ export default function Chat() {
         pendingConvo.initiatorIdentityKey, // Store initiator's signing key
         false, // We're not the initiator
         pendingConvo.type,
-        group === "false" ? pendingConvo.initiatorId.toString() : undefined,
+        group === "false" ? pendingConvo.initiatorId.toString() : undefined
       );
 
       // 11. Update local state
@@ -521,7 +557,7 @@ export default function Chat() {
         exportedSignPub,
         true,
         "DIRECT",
-        userId,
+        userId
       );
 
       // Store keys in ref for later use
@@ -604,7 +640,8 @@ export default function Chat() {
       const secureMessage = JSON.parse(message.encryptedContent);
 
       // Import the recipient's public signing key if it's in JWK format
-      const verificationKey: CryptoKey = conversationKeysRef.current.signKeyPair.publicKey;
+      const verificationKey: CryptoKey =
+        conversationKeysRef.current.signKeyPair.publicKey;
 
       // Process and verify the secure message
       const { message: decryptedText, isAuthentic } =
@@ -621,8 +658,9 @@ export default function Chat() {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        isMine: +message.senderId === currentUser?.id ? true: false,
-        isAuthentic: +message.senderId === currentUser?.id ? undefined : isAuthentic,
+        isMine: +message.senderId === currentUser?.id ? true : false,
+        isAuthentic:
+          +message.senderId === currentUser?.id ? undefined : isAuthentic,
       };
 
       setChatMessages((prev) => [...prev, newMessage]);
