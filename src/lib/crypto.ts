@@ -262,7 +262,7 @@ export async function savePrivateKeys(keys: {
 
     // Store keys in localStorage only
     localStorage.setItem("x3dh_keys", JSON.stringify(exportedKeys));
-    console.log("Keys saved to localStorage successfully");
+    console.log("🔑 Keys saved successfully");
   } catch (error) {
     console.error("Failed to save keys:", error);
     throw error;
@@ -369,7 +369,7 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
       throw new Error("SPK signature verification failed: SPK mismatch");
     }
 
-    console.log("SPK signature verified successfully!");
+    console.log("✅ SPK verified");
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.error("SPK verification error:", errorMessage);
@@ -429,7 +429,7 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
   }
 
   // MODIFIED ECDH KEY DERIVATIONS
-  console.log("Starting ECDH operations");
+  console.log("🔐 Starting X3DH key exchange");
 
   // In standard X3DH:
   // DH1 = DH(IKa, SPKb) - We can't do this if IK is ES256 (signature only)
@@ -491,16 +491,14 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
 
   // Always do DH3 - this should work
   try {
-    console.log("Starting DH3");
     const dh3 = await crypto.subtle.deriveBits(
       { name: "ECDH", public: recipientSPK },
       ek_priv,
       256
     );
     dhResults.push(dh3);
-    console.log("DH3 complete");
   } catch (err) {
-    console.error("DH3 failed:", err);
+    console.error("❌ DH3 failed:", err);
     throw new Error(
       "Critical DH operation failed: " +
         (err instanceof Error ? err.message : String(err))
@@ -508,24 +506,16 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
   }
 
   // Attempt DH4 (if OPK is available)
-  console.log(
-    "Checking for OPK (initiator side) - recipientOPK:",
-    !!recipientOPK,
-    "opkId:",
-    opkId
-  );
   if (recipientOPK) {
     try {
-      console.log("Starting DH4");
       const dh4 = await crypto.subtle.deriveBits(
         { name: "ECDH", public: recipientOPK },
         ek_priv,
         256
       );
       dhResults.push(dh4);
-      console.log("DH4 complete");
     } catch (err) {
-      console.error("DH4 failed:", err);
+      console.error("❌ DH4 failed:", err);
       // Continue without this key
     }
   }
@@ -537,30 +527,17 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
 
   // Concatenate the DH results
   const preMasterSecret = concatBuffers(...dhResults);
-  console.log(
-    "Pre-master secret created from",
-    dhResults.length,
-    "DH operations"
-  );
 
   const info = new TextEncoder().encode("Whispr X3DH Shared Secret v1");
   const salt = new Uint8Array(0);
 
   try {
-    console.log("Starting key derivation with HKDF");
     // Use our own HKDF implementation instead of the external library
     const sharedKeyBytes = await hkdfDerive(
       new Uint8Array(preMasterSecret),
       salt,
       info,
       32 // 32 bytes = 256 bits
-    );
-
-    console.log("HKDF key derivation completed successfully");
-    console.log(
-      "Shared key bytes (initiator):",
-      Array.from(new Uint8Array(sharedKeyBytes)).slice(0, 8),
-      "..."
     );
 
     const SK = await window.crypto.subtle.importKey(
@@ -571,7 +548,7 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
       ["encrypt", "decrypt"]
     );
 
-    console.log("Shared key created successfully");
+    console.log("✅ X3DH session established");
 
     const ek_pub_jwk = await exportJWK(ek_pub);
 
@@ -592,7 +569,7 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
       })),
     };
   } catch (err) {
-    console.error("Error during key derivation:", err);
+    console.error("❌ Key derivation failed:", err);
     throw new Error(
       "Key derivation failed: " +
         (err instanceof Error ? err.message : String(err))
@@ -620,7 +597,7 @@ export async function completeX3DHRecipient(
   myPrivateKeys: MyPrivateKeysType, // Use the defined type
   usedOPKId?: string | number
 ) {
-  console.log("Starting completeX3DHRecipient");
+  console.log("🔐 Processing X3DH recipient");
 
   // Import the initiator's ephemeral key for ECDH
   const initiatorEKPubImport = await importJWK(
@@ -643,16 +620,15 @@ export async function completeX3DHRecipient(
 
   // DH3 = DH(EKa, SPKb) - Always do this, it should work
   try {
-    console.log("Starting DH3 (recipient side)");
     const dh3 = await crypto.subtle.deriveBits(
       { name: "ECDH", public: initiatorEKPub },
       myPrivateKeys.spk_priv, // This is CryptoKey from getPrivateKeys
       256
     );
     dhResults.push(dh3);
-    console.log("DH3 complete");
+    console.log("🔄DH3 complete (recipient)");
   } catch (err) {
-    console.error("DH3 failed:", err);
+    console.error("❌ DH3 failed:", err);
     throw new Error(
       "Critical DH operation failed: " +
         (err instanceof Error ? err.message : String(err))
@@ -660,16 +636,8 @@ export async function completeX3DHRecipient(
   }
 
   // DH4 = DH(EKa, OPKb) - Do this if OPK is available
-  console.log(
-    "Checking for OPK - usedOPKId:",
-    usedOPKId,
-    "opks length:",
-    myPrivateKeys.opks?.length
-  );
   if (usedOPKId && myPrivateKeys.opks) {
     try {
-      console.log("Starting DH4 (recipient side)");
-
       // Find the OPK based on our client-assigned ID
       const usedOPKEntry = myPrivateKeys.opks.find((opk) => {
         return opk.id.toString() === usedOPKId.toString();
@@ -703,9 +671,8 @@ export async function completeX3DHRecipient(
         256
       );
       dhResults.push(dh4);
-      console.log("DH4 complete");
     } catch (err) {
-      console.error("DH4 failed:", err);
+      console.error("❌ DH4 failed:", err);
       // Continue without this key - this is not critical
     }
   }
@@ -717,29 +684,16 @@ export async function completeX3DHRecipient(
 
   // Concatenate the DH results
   const preMasterSecret = concatBuffers(...dhResults);
-  console.log(
-    "Pre-master secret created from",
-    dhResults.length,
-    "DH operations (recipient side)"
-  );
 
   const info = new TextEncoder().encode("Whispr X3DH Shared Secret v1");
   const salt = new Uint8Array([]);
 
   try {
-    console.log("Starting key derivation with HKDF (recipient side)");
     const sharedKeyBytes = await hkdfDerive(
       new Uint8Array(preMasterSecret),
       salt,
       info,
       32
-    );
-
-    console.log("HKDF key derivation completed successfully (recipient side)");
-    console.log(
-      "Shared key bytes (recipient):",
-      Array.from(new Uint8Array(sharedKeyBytes)).slice(0, 8),
-      "..."
     );
 
     const SK = await crypto.subtle.importKey(
@@ -750,11 +704,11 @@ export async function completeX3DHRecipient(
       ["encrypt", "decrypt"]
     );
 
-    console.log("Shared key created successfully (recipient side)");
+    console.log("✅ X3DH recipient session established");
 
     return { sharedKey: SK };
   } catch (err) {
-    console.error("Error during key derivation (recipient side):", err);
+    console.error("❌ Key derivation failed (recipient):", err);
     throw new Error(
       "Key derivation failed: " +
         (err instanceof Error ? err.message : String(err))

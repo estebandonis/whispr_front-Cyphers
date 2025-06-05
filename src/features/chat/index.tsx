@@ -93,20 +93,6 @@ export default function Chat() {
   const { data: messages, refetch: refetchMessages } =
     useGetConversationMessages(userId!, group !== "true");
 
-  // Debug: Print relevant state on every render
-  const enabledKeyBundle =
-    !!userId &&
-    !conversationId &&
-    !isInitializingConversation &&
-    group !== "true";
-  console.log("[Chat Debug]", {
-    userId,
-    group,
-    conversationId,
-    isInitializingConversation,
-    enabledKeyBundle,
-  });
-
   useEffect(() => {
     setConversationId(null); // Reset conversationId when switching chats
     setIsSessionEstablished(false); // Optionally reset session state
@@ -170,27 +156,14 @@ export default function Chat() {
       try {
         // Check if we have an existing conversation with this user
         let existingConvId = null;
-        console.log(
-          "Group flag:",
-          group,
-          " group === 'false':",
-          group === "false",
-          " typeof group:",
-          typeof group
-        );
-        console.log("User ID:", userId, " Type of userId:", typeof userId);
         if (group === "false") {
           existingConvId = getConversationWithUser(userId);
-          console.log("Existing conversation ID:", existingConvId);
         } else {
           existingConvId = getConversationWithConvId(+userId);
-          console.log("Existing conversation ID from convId:", existingConvId);
         }
 
-        console.log("Pending conversations:", pendingConversations);
-
         if (existingConvId) {
-          console.log(`Found existing conversation: ${existingConvId}`);
+          console.log(`🔄 Found existing conversation: ${existingConvId}`);
           // Load conversation keys
           const keys = await loadConversationKeys(existingConvId);
 
@@ -206,41 +179,39 @@ export default function Chat() {
 
             setConversationId(existingConvId);
             setIsSessionEstablished(true);
-            console.log("Conversation keys loaded successfully");
+            console.log("🔑 Keys loaded successfully");
           } else {
-            console.error("Failed to load conversation keys");
+            console.error("❌ Failed to load conversation keys");
           }
         }
         // Check if we're the recipient of a pending conversation with this user
         else if (pendingConversations && pendingConversations.length > 0) {
           console.log(
-            "pending: ",
-            pendingConversations.length,
-            " conversations found"
+            `⏳ ${pendingConversations.length} pending conversations found`
           );
           // Find a pending conversation with this user
           const pendingConvo = pendingConversations.find(
             (convo: PendingConversation) =>
-              (group === "false" && (convo.initiatorId.toString() === userId ||
-              convo.initiatorId.toString() === currentUser?.id?.toString())) ||
+              (group === "false" &&
+                (convo.initiatorId.toString() === userId ||
+                  convo.initiatorId.toString() ===
+                    currentUser?.id?.toString())) ||
               (group === "true" && convo.id.toString() === userId)
           );
 
           if (pendingConvo) {
-            console.log(
-              "Found pending conversation as recipient, processing..."
-            );
+            console.log("🔓 Processing pending conversation");
             await processPendingConversation(pendingConvo);
           }
           // If no pending conversation with this specific user, but we have keyBundle, initiate new
           else if (keyBundle && !isInitializingConversation) {
-            console.log("No existing conversation, initializing new one");
+            console.log("🆕 Initializing new conversation");
             await initializeNewConversation();
           }
         }
         // If no pending conversations at all, but we have keyBundle, initiate new
         else if (keyBundle && !isInitializingConversation) {
-          console.log("No existing conversation, initializing new one");
+          console.log("🆕 Initializing new conversation");
           await initializeNewConversation();
         }
       } catch (error) {
@@ -253,14 +224,14 @@ export default function Chat() {
 
   useEffect(() => {
     if (isSessionEstablished && conversationId) {
-      console.log("Connecting to WebSocket...");
+      console.log("🔌 Connecting to WebSocket...");
       const serverUrl =
         import.meta.env.VITE_SERVER_URL || "http://localhost:3000";
       const isSecure = serverUrl.startsWith("https://");
       const wsProtocol = isSecure ? "wss://" : "ws://";
       const wsBaseUrl = serverUrl.replace(/^https?:\/\//, "");
       const wsUrl = `${wsProtocol}${wsBaseUrl}/message/ws/${conversationId}`;
-      
+
       let retryCount = 0;
       const maxRetries = 5;
       const baseDelay = 1000; // 1 second
@@ -268,9 +239,9 @@ export default function Chat() {
 
       const connectWebSocket = () => {
         const ws = new WebSocket(wsUrl);
-        
+
         ws.addEventListener("open", () => {
-          console.log("WebSocket connection opened");
+          console.log("✅ WebSocket connected");
           retryCount = 0; // Reset retry count on successful connection
           wsRef.current = ws;
         });
@@ -283,30 +254,32 @@ export default function Chat() {
               await processReceivedMessage(data);
             }
           } catch (error) {
-            console.error("Error parsing WebSocket message:", error);
+            console.error("❌ Error parsing WebSocket message:", error);
           }
         });
 
         ws.addEventListener("close", (event) => {
-          console.log("WebSocket connection closed", event.code, event.reason);
+          console.log("🔌 WebSocket disconnected", event.code);
           wsRef.current = null;
-          
+
           // Only retry if it wasn't a manual close and we haven't exceeded max retries
           if (event.code !== 1000 && retryCount < maxRetries) {
             const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff
-            console.log(`Retrying WebSocket connection in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
-            
+            console.log(
+              `🔄 Retrying in ${delay}ms (${retryCount + 1}/${maxRetries})`
+            );
+
             reconnectTimeout = setTimeout(() => {
               retryCount++;
               connectWebSocket();
             }, delay);
           } else if (retryCount >= maxRetries) {
-            console.error("Max WebSocket retry attempts reached");
+            console.error("❌ Max WebSocket retry attempts reached");
           }
         });
 
         ws.addEventListener("error", (error) => {
-          console.error("WebSocket error:", error);
+          console.error("❌ WebSocket error:", error);
         });
       };
 
@@ -335,7 +308,6 @@ export default function Chat() {
   ) => {
     try {
       setIsInitializingConversation(true);
-      console.log("Processing pending conversation:", pendingConvo);
 
       // 1. Get our private keys
       const myKeys = await getPrivateKeys();
@@ -344,36 +316,16 @@ export default function Chat() {
       const { ephemeralKeyPublicJWK, iv, ciphertext, usedOPKId } =
         pendingConvo.initialPayload;
 
-      console.log("initialPayload:", pendingConvo.initialPayload);
-
       // 3. Derive the shared secret using X3DH (recipient side)
-      console.log("usedOPKId:", usedOPKId);
-      console.log("ephemeralKeyPublicJWK:", ephemeralKeyPublicJWK);
-      console.log("initiatorIdentityKey:", pendingConvo.initiatorIdentityKey);
-
       const { sharedKey } = await completeX3DHRecipient(
         ephemeralKeyPublicJWK,
-        // pendingConvo.initiatorIdentityKey || {}, // Provide a default empty object if not available
-        myKeys as any, // Use type assertion to avoid complex type issues
+        myKeys as any,
         usedOPKId
       );
 
       // 4. Decrypt the initial payload
       const ivArray = new Uint8Array(iv);
       const ciphertextArray = new Uint8Array(ciphertext);
-
-      console.log("Attempting to decrypt with shared key:", sharedKey);
-      console.log(
-        "IV length:",
-        ivArray.length,
-        "Ciphertext length:",
-        ciphertextArray.length
-      );
-      console.log("IV bytes:", Array.from(ivArray));
-      console.log(
-        "First 16 bytes of ciphertext:",
-        Array.from(ciphertextArray.slice(0, 16))
-      );
 
       const decrypted = await window.crypto.subtle.decrypt(
         { name: "AES-GCM", iv: ivArray },
@@ -383,7 +335,6 @@ export default function Chat() {
 
       // 5. Parse the decrypted message
       const keyMessage = JSON.parse(new TextDecoder().decode(decrypted));
-      console.log("Decrypted keyMessage:", keyMessage);
       const { convSignPub, convSignPriv, convSymKey } = keyMessage;
 
       // 6. Generate our own signing key pair for this conversation
@@ -394,9 +345,6 @@ export default function Chat() {
       );
 
       // 7. Import the symmetric key from the initiator
-      console.log("convSymKey type:", typeof convSymKey);
-      console.log("convSymKey:", convSymKey);
-
       // Handle both array and object formats
       let symKeyArray;
       if (Array.isArray(convSymKey)) {
@@ -408,11 +356,7 @@ export default function Chat() {
         throw new Error("Invalid convSymKey format: " + typeof convSymKey);
       }
 
-      console.log("symKeyArray length:", symKeyArray.length);
-      console.log("symKeyArray first 8 bytes:", symKeyArray.slice(0, 8));
-
       const symKeyBytes = new Uint8Array(symKeyArray);
-      console.log("symKeyBytes length:", symKeyBytes.length);
 
       const importedSymKey = await window.crypto.subtle.importKey(
         "raw",
@@ -483,7 +427,7 @@ export default function Chat() {
 
       setConversationId(pendingConvo.id.toString());
       setIsSessionEstablished(true);
-      console.log("Processed pending conversation successfully");
+      console.log("✅ Pending conversation processed");
     } catch (error) {
       console.error("Failed to process pending conversation:", error);
     } finally {
@@ -496,11 +440,8 @@ export default function Chat() {
     if (!userId || !keyBundle || isInitializingConversation) return;
     try {
       setIsInitializingConversation(true);
-      console.log("Initializing new conversation with user:", userId);
-      console.log("Recipient's key bundle:", keyBundle);
 
       // Step 1: Run X3DH to establish a shared secret
-      console.log("Key bundle for X3DH:", keyBundle);
       const { sharedKey, ephemeralKeyPublicJWK, usedOPKId } =
         await initializeX3DHSession(keyBundle);
 
@@ -537,12 +478,6 @@ export default function Chat() {
 
       // Step 4: Prepare initial key message
       const symKeyArray = Array.from(new Uint8Array(exportedSymKey));
-      console.log(
-        "Exporting symKey as array, length:",
-        symKeyArray.length,
-        "first 8 bytes:",
-        symKeyArray.slice(0, 8)
-      );
 
       const keyMessage = {
         convSignPub: exportedSignPub,
@@ -561,7 +496,6 @@ export default function Chat() {
       );
 
       // Step 6: Send the encrypted key message to the recipient
-      console.log("Sending conversation initiation with usedOPKId:", usedOPKId);
       const initiationResponse = await initiateConversation({
         recipientId: userId,
         payload: {
@@ -572,8 +506,6 @@ export default function Chat() {
           initiatorId: currentUser?.id?.toString() || "", // Use current user ID
         },
       });
-
-      console.log("Conversation initiation response:", initiationResponse);
 
       // Step 7: Save the conversation keys locally
       const convId = await saveConversationKeys(
@@ -597,7 +529,7 @@ export default function Chat() {
 
       setConversationId(initiationResponse.conversationId);
       setIsSessionEstablished(true);
-      console.log("New conversation initialized successfully with ID:", convId);
+      console.log(`✅ New conversation initialized: ${convId}`);
     } catch (error) {
       console.error("Failed to initialize new conversation:", error);
     } finally {
@@ -632,9 +564,9 @@ export default function Chat() {
         };
 
         wsRef.current.send(JSON.stringify(messagePayload));
-        console.log("Message sent through WebSocket");
+        console.log("📤 Message sent");
       } else {
-        console.error("WebSocket not connected, cannot send message");
+        console.error("❌ WebSocket not connected");
         // Optionally fall back to HTTP API
         return;
       }
@@ -653,9 +585,7 @@ export default function Chat() {
       !conversationKeysRef.current ||
       !conversationKeysRef.current.theirSignPubKey
     ) {
-      console.error(
-        "Cannot process message: Missing conversation keys or recipient's signing key"
-      );
+      console.error("❌ Missing conversation keys");
       return;
     }
 
@@ -691,7 +621,7 @@ export default function Chat() {
 
       setChatMessages((prev) => [...prev, newMessage]);
     } catch (error) {
-      console.error("Error processing received message:", error);
+      console.error("❌ Error processing received message:", error);
     }
   };
 
