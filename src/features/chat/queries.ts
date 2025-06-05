@@ -23,7 +23,7 @@ export const useListUsers = () => {
 // Fetch a user's key bundle
 export const useGetUserKeyBundle = (
   userId: string,
-  options?: { enabled?: boolean, disabled?: boolean }
+  options?: { enabled?: boolean; disabled?: boolean }
 ) => {
   return useQuery({
     queryKey: ["keyBundle", userId],
@@ -81,7 +81,7 @@ export const useInitiateGroupConversation = () => {
           ephemeralKeyPublicJWK: any;
           usedOPKId?: string | number;
           initiatorId: string;
-        }
+        };
       }[];
     }) => {
       const { data } = await api.post(`/conversations/group`, {
@@ -132,7 +132,10 @@ export const useSendMessage = () => {
 };
 
 // Fetch messages for a conversation
-export const useGetConversationMessages = (conversationId: string, isDirectMessage: boolean) => {
+export const useGetConversationMessages = (
+  conversationId: string,
+  isDirectMessage: boolean
+) => {
   return useQuery({
     queryKey: ["messages", conversationId, isDirectMessage],
     queryFn: async () => {
@@ -140,8 +143,8 @@ export const useGetConversationMessages = (conversationId: string, isDirectMessa
         `/conversations/${conversationId}/messages`,
         {
           params: {
-            isDirectMessage: isDirectMessage
-          }
+            isDirectMessage: isDirectMessage,
+          },
         }
       );
       return data;
@@ -151,14 +154,17 @@ export const useGetConversationMessages = (conversationId: string, isDirectMessa
 };
 
 // Fetch pending conversations where the user is the recipient
-export const useGetPendingConversations = (options?: { enabled?: boolean }) => {
+export const useGetPendingConversations = (
+  userId?: string,
+  options?: { enabled?: boolean }
+) => {
   return useQuery({
-    queryKey: ["pendingConversations"],
+    queryKey: ["pendingConversations", userId],
     queryFn: async () => {
       const { data } = await api.get(`/conversations/pending`);
       return data;
     },
-    enabled: options?.enabled !== undefined ? options.enabled : true,
+    enabled: options?.enabled !== undefined ? options.enabled : !!userId,
   });
 };
 
@@ -191,5 +197,5 @@ export const useDeleteUser = () => {
       const { data } = await api.delete(`/user`);
       return data;
     },
-  }); 
-}
+  });
+};

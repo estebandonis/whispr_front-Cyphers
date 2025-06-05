@@ -85,7 +85,7 @@ export default function Chat() {
 
   // Add hooks for pending conversations
   const { data: pendingConversations, isLoading: isLoadingPending } =
-    useGetPendingConversations({
+    useGetPendingConversations(userId, {
       enabled: !conversationId && !isInitializingConversation,
     });
   const { mutateAsync: acceptConversation } = useAcceptConversation();
