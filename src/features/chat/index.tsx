@@ -144,10 +144,11 @@ export default function Chat() {
     const checkExistingConversation = async () => {
       try {
         // Check if we have an existing conversation with this user
-        let existingConvId = getConversationWithUser(userId);
-        console.log("Existing conversation ID:", existingConvId);
-
-        if (!existingConvId){
+        let existingConvId = null;
+        if (group !== "true") {
+          existingConvId = getConversationWithUser(userId);
+          console.log("Existing conversation ID:", existingConvId);
+        } else {
           existingConvId = getConversationWithConvId(+userId);
           console.log("Existing conversation ID from convId:", existingConvId);
         }
