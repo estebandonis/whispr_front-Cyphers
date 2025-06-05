@@ -159,7 +159,7 @@ export default function Chat() {
     };
 
     processMessages();
-  }, [messages, currentUser?.id, refetchMessages]);
+  }, [messages, currentUser?.id, userId, refetchMessages]);
 
   // Check for existing conversation or start a new one
   useEffect(() => {
@@ -221,9 +221,9 @@ export default function Chat() {
           // Find a pending conversation with this user
           const pendingConvo = pendingConversations.find(
             (convo: PendingConversation) =>
-              convo.initiatorId.toString() === userId ||
-              convo.initiatorId.toString() === currentUser?.id?.toString() ||
-              convo.id.toString() === userId
+              (group === "false" && (convo.initiatorId.toString() === userId ||
+              convo.initiatorId.toString() === currentUser?.id?.toString())) ||
+              (group === "true" && convo.id.toString() === userId)
           );
 
           if (pendingConvo) {
@@ -249,7 +249,7 @@ export default function Chat() {
     };
 
     checkExistingConversation();
-  }, [userId, keyBundle, pendingConversations]);
+  }, [userId, group, keyBundle, pendingConversations]);
 
   useEffect(() => {
     if (isSessionEstablished && conversationId) {
@@ -260,40 +260,66 @@ export default function Chat() {
       const wsProtocol = isSecure ? "wss://" : "ws://";
       const wsBaseUrl = serverUrl.replace(/^https?:\/\//, "");
       const wsUrl = `${wsProtocol}${wsBaseUrl}/message/ws/${conversationId}`;
-      const ws = new WebSocket(wsUrl);
+      
+      let retryCount = 0;
+      const maxRetries = 5;
+      const baseDelay = 1000; // 1 second
+      let reconnectTimeout: NodeJS.Timeout;
 
-      // Store WebSocket reference
-      wsRef.current = ws;
+      const connectWebSocket = () => {
+        const ws = new WebSocket(wsUrl);
+        
+        ws.addEventListener("open", () => {
+          console.log("WebSocket connection opened");
+          retryCount = 0; // Reset retry count on successful connection
+          wsRef.current = ws;
+        });
 
-      ws.addEventListener("open", () => {
-        console.log("WebSocket connection opened");
-      });
-
-      ws.addEventListener("message", async (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === "message" && data.encryptedContent) {
-            // Process the received encrypted message
-            await processReceivedMessage(data);
+        ws.addEventListener("message", async (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === "message" && data.encryptedContent) {
+              // Process the received encrypted message
+              await processReceivedMessage(data);
+            }
+          } catch (error) {
+            console.error("Error parsing WebSocket message:", error);
           }
-        } catch (error) {
-          console.error("Error parsing WebSocket message:", error);
-        }
-      });
+        });
 
-      ws.addEventListener("close", () => {
-        console.log("WebSocket connection closed");
-        wsRef.current = null;
-      });
+        ws.addEventListener("close", (event) => {
+          console.log("WebSocket connection closed", event.code, event.reason);
+          wsRef.current = null;
+          
+          // Only retry if it wasn't a manual close and we haven't exceeded max retries
+          if (event.code !== 1000 && retryCount < maxRetries) {
+            const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff
+            console.log(`Retrying WebSocket connection in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+            
+            reconnectTimeout = setTimeout(() => {
+              retryCount++;
+              connectWebSocket();
+            }, delay);
+          } else if (retryCount >= maxRetries) {
+            console.error("Max WebSocket retry attempts reached");
+          }
+        });
 
-      ws.addEventListener("error", (error) => {
-        console.error("WebSocket error:", error);
-      });
+        ws.addEventListener("error", (error) => {
+          console.error("WebSocket error:", error);
+        });
+      };
+
+      // Initial connection
+      connectWebSocket();
 
       // Cleanup on unmount or dependency change
       return () => {
+        if (reconnectTimeout) {
+          clearTimeout(reconnectTimeout);
+        }
         if (wsRef.current) {
-          wsRef.current.close();
+          wsRef.current.close(1000, "Component unmounting"); // Normal closure
           wsRef.current = null;
         }
       };
