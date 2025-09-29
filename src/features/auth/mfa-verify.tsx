@@ -35,11 +35,13 @@ export default function MfaPage() {
     verifyMfa(
       { token: otp, userId },
       {
-        onSuccess: ({ access_token, refresh_token }) => {
-          localStorage.setItem("access_token", access_token);
-          localStorage.setItem("refresh_token", refresh_token);
-          toast.success("Logged in");
-          navigate("/chat");
+        onSuccess: ({ success, message }) => {
+          if (success) {
+            toast.success(message || "MFA verified successfully");
+            navigate("/chat");
+          } else {
+            toast.error("Error verifying MFA");
+          }
         },
         onError: (error) => {
           if (error instanceof AxiosError) {

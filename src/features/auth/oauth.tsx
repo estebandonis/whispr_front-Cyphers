@@ -29,15 +29,12 @@ export default function OAuth() {
           return;
         }
 
-        if (!result.access_token || !result.refresh_token) {
+        if (result.success) {
+          toast.success(result.message || "Logged in with GitHub");
+          navigate("/chat");
+        } else {
           toast.error("Error logging in with GitHub");
-          return;
         }
-
-        localStorage.setItem("access_token", result.access_token);
-        localStorage.setItem("refresh_token", result.refresh_token);
-        toast.success("Logged in with GitHub");
-        navigate("/chat");
       } catch (error) {
         console.log("OAuth error:", error);
         // Reset the flag on error so user can retry if needed

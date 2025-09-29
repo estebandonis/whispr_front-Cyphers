@@ -10,15 +10,15 @@ const login = async (
   username: string,
   password: string
 ): Promise<{
-  access_token?: string;
-  refresh_token?: string;
+  success?: boolean;
+  message?: string;
   mfa?: boolean;
   userId?: string;
 }> => {
   const {
-    data: { access_token, refresh_token, mfa, userId },
+    data: { success, message, mfa, userId },
   } = await api.post("/auth/login", { username, password });
-  return { access_token, refresh_token, mfa, userId };
+  return { success, message, mfa, userId };
 };
 
 export const useLogin = () => {
@@ -36,16 +36,16 @@ export const useLogin = () => {
 const loginWithGithubOAuth = async (
   code: string
 ): Promise<{
-  access_token?: string;
-  refresh_token?: string;
+  success?: boolean;
+  message?: string;
   mfa?: boolean;
   userId?: string;
 }> => {
   const response = await api.post("/auth/oauth/github", { code });
   const {
-    data: { access_token, refresh_token, mfa, userId },
+    data: { success, message, mfa, userId },
   } = response;
-  return { access_token, refresh_token, mfa, userId };
+  return { success, message, mfa, userId };
 };
 
 export const useGithubOAuthLogin = () => {
@@ -136,13 +136,13 @@ const verifyMfa = async (
   token: string,
   userId: string
 ): Promise<{
-  access_token: string;
-  refresh_token: string;
+  success: boolean;
+  message: string;
 }> => {
   const {
-    data: { access_token, refresh_token },
+    data: { success, message },
   } = await api.post("/auth/mfa/verify", { token, userId });
-  return { access_token, refresh_token };
+  return { success, message };
 };
 
 export const useVerifyMfa = () => {

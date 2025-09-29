@@ -2,15 +2,13 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_SERVER_URL,
+  withCredentials: true,
 });
 
-api.interceptors.request.use((config) => {
-  const access_token = localStorage.getItem("access_token");
-  if (access_token) {
-    config.headers.Authorization = `Bearer ${access_token}`;
-  }
-  return config;
-});
+// Request interceptor is no longer needed since cookies are automatically sent
+// api.interceptors.request.use((config) => {
+//   return config;
+// });
 
 let isRefreshing = false;
 let failedQueue: Array<{
@@ -19,26 +17,18 @@ let failedQueue: Array<{
   config: any;
 }> = [];
 
-const processQueue = (error: unknown, token: string | null = null) => {
+const processQueue = (error: unknown) => {
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
-    } else if (token) {
-      prom.config.headers["Authorization"] = `Bearer ${token}`;
+    } else {
       api(prom.config).then(prom.resolve).catch(prom.reject);
     }
   });
   failedQueue = [];
 };
 
-interface AxiosErrorLike {
-  response?: {
-    data?: unknown;
-  };
-  message?: string;
-}
-
-// Add response interceptor to handle token expiration and refresh
+// Simplified response interceptor for cookie-based auth
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -51,6 +41,14 @@ api.interceptors.response.use(
       error.response.status === 401 &&
       !originalRequest._retry
     ) {
+      // Don't try to refresh for auth-related endpoints or user check endpoints
+      if (
+        originalRequest.url?.includes("/auth/") ||
+        originalRequest.url?.includes("/user/me")
+      ) {
+        return Promise.reject(error);
+      }
+
       if (isRefreshing) {
         // If currently refreshing, queue the original request
         return new Promise((resolve, reject) => {
@@ -61,60 +59,25 @@ api.interceptors.response.use(
       originalRequest._retry = true; // Mark the request as retried
       isRefreshing = true;
 
-      const refreshToken = localStorage.getItem("refresh_token"); // Assumed key for refresh token
-
-      if (!refreshToken) {
-        console.log("No refresh token available. Clearing tokens.");
-        localStorage.removeItem("access_token"); // Changed from jwt-token
-        localStorage.removeItem("refresh_token"); // Ensure refresh token is also cleared
-        // Potentially redirect to login page or dispatch a logout action
-        isRefreshing = false;
-        processQueue(error, null); // Reject queued requests
-        return Promise.reject(error);
-      }
-
       try {
-        // Use a direct axios.post call for the refresh token request
-        // to avoid circular dependency with the interceptor.
-        // Updated endpoint and request body
-        const refreshResponse = await axios.post(
-          `${import.meta.env.VITE_SERVER_URL}/auth/refresh-token`, // Changed endpoint
-          { refresh_token: refreshToken } // Changed body
-        );
+        // Try to refresh the token using cookies
+        // The refresh token is automatically sent via cookies
+        await api.post("/auth/refresh-token");
 
-        // Assumed response structure: { access_token: "new-access-token", refresh_token: "new-refresh-token" }
-        const newAccessToken = refreshResponse.data.access_token; // Changed from accessToken
-        const newRefreshToken = refreshResponse.data.refresh_token; // Changed from refreshToken
-
-        localStorage.setItem("access_token", newAccessToken); // Changed from jwt-token
-        localStorage.setItem("refresh_token", newRefreshToken);
-
-        // Update the default Authorization header for new requests
-        if (api.defaults.headers.common) {
-          api.defaults.headers.common[
-            "Authorization"
-          ] = `Bearer ${newAccessToken}`;
-        }
-        // Update the Authorization header for the original request
-        originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
-
-        processQueue(null, newAccessToken); // Process queued requests with the new token
-        return api(originalRequest); // Retry the original request with the new token
+        processQueue(null); // Process queued requests
+        return api(originalRequest); // Retry the original request
       } catch (refreshError: unknown) {
-        const err = refreshError as AxiosErrorLike;
-        console.error(
-          "Error refreshing token:",
-          err.response?.data || err.message
-        );
-        localStorage.removeItem("access_token"); // Changed from jwt-token
-        localStorage.removeItem("refresh_token");
-        // Potentially redirect to login page or dispatch a logout action
+        console.error("Error refreshing token:", refreshError);
 
-        processQueue(refreshError, null); // Reject queued requests with the refresh error
-        // Prefer rejecting with the error from the refresh attempt
-        return Promise.reject(
-          (refreshError as AxiosErrorLike).response?.data ? refreshError : error
-        );
+        // If refresh fails, redirect to login
+        processQueue(refreshError); // Reject queued requests
+
+        // Only redirect if we're not already on the login page
+        if (window.location.pathname !== "/") {
+          window.location.href = "/";
+        }
+
+        return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
       }
