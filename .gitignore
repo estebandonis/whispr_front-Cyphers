@@ -25,3 +25,8 @@ dist-ssr
 
 # ignore env
 *.env
+
+/dependency-check-bin
+.scannerwork
+coverage
+dependency-check-reports
