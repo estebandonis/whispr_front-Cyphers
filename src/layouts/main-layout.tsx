@@ -18,7 +18,7 @@ export default function MainLayout() {
       try {
         const hasKeys = localStorage.getItem("x3dh_keys") !== null;
 
-        if (!hasKeys) {
+        if (hasKeys === false) {
           const { publicBundle } = await initializeX3DH();
 
           await api.post(`/user/${user.id}/keybundle`, publicBundle);

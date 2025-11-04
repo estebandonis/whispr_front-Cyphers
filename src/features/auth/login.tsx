@@ -90,9 +90,9 @@ export default function LoginPage() {
         >
           <NavLink
             to={
-              !loggingIn
-                ? `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}`
-                : ""
+              loggingIn
+                ? ""
+                : `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}`
             }
             className={`text-white ${
               loggingIn ? "cursor-not-allowed opacity-50" : ""
@@ -102,7 +102,7 @@ export default function LoginPage() {
           </NavLink>
         </Button>
         <p className="text-neutral-400 text-xs text-center">
-          <NavLink to={!loggingIn ? "/sign-up" : ""} viewTransition>
+          <NavLink to={loggingIn ? "" : "/sign-up"} viewTransition>
             I'm new here,{" "}
             <span className="text-white hover:underline">Sign up</span>
           </NavLink>

@@ -110,18 +110,11 @@ export default function CreateGroupModal({
                 <p className="text-neutral-400 text-sm">No users available</p>
               ) : (
                 availableUsers.map((user) => (
-                  <div
+                  <button
                     key={user.id}
-                    className="flex items-center space-x-3 p-2 hover:bg-neutral-700 rounded cursor-pointer"
+                    type="button"
+                    className="flex items-center space-x-3 p-2 hover:bg-neutral-700 rounded cursor-pointer w-full text-left"
                     onClick={() => handleUserToggle(user.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleUserToggle(user.id);
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
                   >
                     <input
                       type="checkbox"
@@ -129,13 +122,14 @@ export default function CreateGroupModal({
                       checked={selectedUsers.includes(user.id)}
                       onChange={() => handleUserToggle(user.id)}
                       className="border-neutral-600"
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-neutral-200 truncate">
                         {user.name}
                       </p>
                     </div>
-                  </div>
+                  </button>
                 ))
               )}
             </div>

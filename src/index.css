@@ -128,6 +128,7 @@
   font-style: italic;
 }
 
+/* stylelint-disable-next-line at-rule-no-unknown */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {

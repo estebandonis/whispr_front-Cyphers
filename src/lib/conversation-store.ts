@@ -158,10 +158,13 @@ export async function loadConversationKeys(
  */
 export function getConversationData(convId: string): unknown | null {
   const storedData = localStorage.getItem(STORAGE_KEY);
-  if (!storedData) return null;
+  if (!storedData) {
+    return null;
+  }
 
   const conversations = JSON.parse(storedData);
-  return conversations[convId] || null;
+  const conversation = conversations[convId];
+  return conversation ?? null;
 }
 
 /**

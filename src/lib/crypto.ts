@@ -311,7 +311,10 @@ async function verifySPKSignature(
 ): Promise<void> {
   try {
     const { payload } = await jwtVerify(prekeySignature, recipientIK);
-    const signedSPK = (payload as any).spk;
+    const signedSPK = (payload as Record<string, unknown>).spk as Record<
+      string,
+      unknown
+    >;
 
     const providedSPKEssential = {
       kty: spkJwk.kty,
@@ -548,8 +551,8 @@ export async function initializeX3DHSession(recipientPublicBundle: any) {
 
 interface StoredOpkType {
   id: number; // Client-assigned ID field for OPKs
-  pub: unknown | CryptoKey; // Changed JsonWebKey to unknown
-  priv: unknown | CryptoKey; // Changed JsonWebKey to unknown
+  pub: CryptoKey | Record<string, unknown>; // JWK format or CryptoKey
+  priv: CryptoKey | Record<string, unknown>; // JWK format or CryptoKey
 }
 
 interface MyPrivateKeysType {
@@ -571,8 +574,8 @@ async function importOPKPrivateKey(
   }
 
   if (typeof usedOPKEntry.priv === "object" && usedOPKEntry.priv !== null) {
-    const privateJwk = usedOPKEntry.priv as any;
-    if (!privateJwk.kty) {
+    const privateJwk = usedOPKEntry.priv as Record<string, unknown>;
+    if (!("kty" in privateJwk) || typeof privateJwk.kty !== "string") {
       throw new TypeError("OPK private key is not a valid JWK object.");
     }
     const importedKey = await importJWK(privateJwk, "ECDH-ES");
