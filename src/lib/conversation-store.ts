@@ -25,12 +25,12 @@ export async function saveConversationKeys(
 ): Promise<number> {
 
   // Export keys for storage
-  const exportedSymKey = await window.crypto.subtle.exportKey("jwk", symKey);
-  const exportedSignPriv = await window.crypto.subtle.exportKey(
+  const exportedSymKey = await globalThis.crypto.subtle.exportKey("jwk", symKey);
+  const exportedSignPriv = await globalThis.crypto.subtle.exportKey(
     "jwk",
     signKeyPair.privateKey
   );
-  const exportedSignPub = await window.crypto.subtle.exportKey(
+  const exportedSignPub = await globalThis.crypto.subtle.exportKey(
     "jwk",
     signKeyPair.publicKey
   );
@@ -114,7 +114,7 @@ export async function loadConversationKeys(
   if (!conv) return null;
 
   // Import keys from storage
-  const symKey = await window.crypto.subtle.importKey(
+  const symKey = await globalThis.crypto.subtle.importKey(
     "jwk",
     conv.symKey,
     { name: "AES-GCM", length: 256 },
@@ -122,7 +122,7 @@ export async function loadConversationKeys(
     ["encrypt", "decrypt"]
   );
 
-  const signPrivateKey = await window.crypto.subtle.importKey(
+  const signPrivateKey = await globalThis.crypto.subtle.importKey(
     "jwk",
     conv.signKeyPair.privateKey,
     { name: "ECDSA", namedCurve: "P-256" },
@@ -130,7 +130,7 @@ export async function loadConversationKeys(
     ["sign"]
   );
 
-  const signPublicKey = await window.crypto.subtle.importKey(
+  const signPublicKey = await globalThis.crypto.subtle.importKey(
     "jwk",
     conv.signKeyPair.publicKey,
     { name: "ECDSA", namedCurve: "P-256" },
@@ -156,7 +156,7 @@ export async function loadConversationKeys(
 /**
  * Get conversation by ID without importing the keys
  */
-export function getConversationData(convId: string): any | null {
+export function getConversationData(convId: string): unknown | null {
   const storedData = localStorage.getItem(STORAGE_KEY);
   if (!storedData) return null;
 

@@ -31,7 +31,7 @@ export const useGetUserKeyBundle = (
       const { data } = await api.get(`/user/${userId}/keybundle`);
       return data;
     },
-    enabled: options?.enabled !== undefined ? options.enabled : !!userId, // Use provided enabled option or default to !!userId
+    enabled: options?.enabled ?? !!userId, // Use provided enabled option or default to !!userId
   });
 };
 
@@ -164,7 +164,7 @@ export const useGetPendingConversations = (
       const { data } = await api.get(`/conversations/pending`);
       return data;
     },
-    enabled: options?.enabled !== undefined ? options.enabled : !!userId,
+    enabled: options?.enabled ?? !!userId,
   });
 };
 

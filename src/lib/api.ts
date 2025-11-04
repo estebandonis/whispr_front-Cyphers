@@ -18,13 +18,13 @@ let failedQueue: Array<{
 }> = [];
 
 const processQueue = (error: unknown) => {
-  failedQueue.forEach((prom) => {
+  for (const prom of failedQueue) {
     if (error) {
-      prom.reject(error);
+      prom.reject(error instanceof Error ? error : new Error(String(error)));
     } else {
       api(prom.config).then(prom.resolve).catch(prom.reject);
     }
-  });
+  }
   failedQueue = [];
 };
 
@@ -46,7 +46,7 @@ api.interceptors.response.use(
         originalRequest.url?.includes("/auth/") ||
         originalRequest.url?.includes("/user/me")
       ) {
-        return Promise.reject(error);
+        throw error instanceof Error ? error : new Error(String(error));
       }
 
       if (isRefreshing) {
@@ -73,18 +73,20 @@ api.interceptors.response.use(
         processQueue(refreshError); // Reject queued requests
 
         // Only redirect if we're not already on the login page
-        if (window.location.pathname !== "/") {
-          window.location.href = "/";
+        if ((globalThis as typeof window).location.pathname !== "/") {
+          (globalThis as typeof window).location.href = "/";
         }
 
-        return Promise.reject(refreshError);
+        throw refreshError instanceof Error
+          ? refreshError
+          : new Error(String(refreshError));
       } finally {
         isRefreshing = false;
       }
     }
 
     // For other errors or if it's a retry that failed again, reject the promise
-    return Promise.reject(error);
+    throw error instanceof Error ? error : new Error(String(error));
   }
 );
 

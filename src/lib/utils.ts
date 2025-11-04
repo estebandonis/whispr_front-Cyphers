@@ -18,7 +18,7 @@ export const logout = async () => {
     // Clear local data and redirect
     queryClient.clear();
     // No need to remove tokens from localStorage since we're using cookies now
-    window.location.href = "/";
+    globalThis.location.href = "/";
   }
 };
 

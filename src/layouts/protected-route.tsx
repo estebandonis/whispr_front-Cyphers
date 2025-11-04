@@ -4,7 +4,7 @@ import { ReactNode } from "react";
 import { Navigate } from "react-router";
 
 interface ProtectedRouteProps {
-  children: ReactNode;
+  readonly children: ReactNode;
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {

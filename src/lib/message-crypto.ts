@@ -10,13 +10,13 @@ export async function encryptMessage(
   encryptionKey: CryptoKey
 ): Promise<{ ciphertext: Uint8Array; iv: Uint8Array }> {
   // Generate a random IV (Initialization Vector)
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
 
   // Encode the message
   const encodedMessage = new TextEncoder().encode(message);
 
   // Encrypt the message
-  const encryptedData = await window.crypto.subtle.encrypt(
+  const encryptedData = await globalThis.crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
     encryptionKey,
     encodedMessage
@@ -37,7 +37,7 @@ export async function decryptMessage(
   encryptionKey: CryptoKey
 ): Promise<string> {
   // Decrypt the message
-  const decryptedData = await window.crypto.subtle.decrypt(
+  const decryptedData = await globalThis.crypto.subtle.decrypt(
     { name: "AES-GCM", iv },
     encryptionKey,
     ciphertext
@@ -60,7 +60,7 @@ export async function signMessage(
   const encodedMessage = new TextEncoder().encode(message);
 
   // Sign the message
-  const signature = await window.crypto.subtle.sign(
+  const signature = await globalThis.crypto.subtle.sign(
     { name: "ECDSA", hash: "SHA-256" },
     signingKey,
     encodedMessage
@@ -81,7 +81,7 @@ export async function verifySignature(
   const encodedMessage = new TextEncoder().encode(message);
 
   // Verify the signature
-  const isValid = await window.crypto.subtle.verify(
+  const isValid = await globalThis.crypto.subtle.verify(
     { name: "ECDSA", hash: "SHA-256" },
     verificationKey,
     signature,

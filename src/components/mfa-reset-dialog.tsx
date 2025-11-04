@@ -11,8 +11,8 @@ import { useResetMfa } from "@/features/auth/queries";
 import { Loader2 } from "lucide-react";
 
 interface Props {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
 }
 
 export default function MfaResetDialog({ open, onOpenChange }: Props) {

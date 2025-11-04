@@ -13,9 +13,12 @@ import { useListUsers } from "@/features/chat/queries";
 import { useCurrentUser } from "@/features/user/queries";
 
 interface CreateGroupModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCreateGroup: (groupName: string, selectedUsers: number[]) => void;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly onCreateGroup: (
+    groupName: string,
+    selectedUsers: number[]
+  ) => Promise<void>;
 }
 
 export default function CreateGroupModal({
@@ -31,7 +34,8 @@ export default function CreateGroupModal({
   const { data: currentUser } = useCurrentUser();
 
   // Filter out current user from the list
-  const availableUsers = users?.filter((user) => user.id !== currentUser?.id) || [];
+  const availableUsers =
+    users?.filter((user) => user.id !== currentUser?.id) || [];
 
   const handleUserToggle = (userId: number) => {
     setSelectedUsers((prev) =>
@@ -43,7 +47,7 @@ export default function CreateGroupModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!groupName.trim() || selectedUsers.length === 0) {
       return;
     }
@@ -51,7 +55,7 @@ export default function CreateGroupModal({
     setIsLoading(true);
     try {
       await onCreateGroup(groupName.trim(), selectedUsers);
-      
+
       // Reset form
       setGroupName("");
       setSelectedUsers([]);
@@ -73,7 +77,9 @@ export default function CreateGroupModal({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[425px] bg-neutral-900 border-neutral-800">
         <DialogHeader>
-          <DialogTitle className="text-neutral-200">Create Group Chat</DialogTitle>
+          <DialogTitle className="text-neutral-200">
+            Create Group Chat
+          </DialogTitle>
           <DialogDescription className="text-neutral-400">
             Create a new group chat and select members to add.
           </DialogDescription>
@@ -82,9 +88,7 @@ export default function CreateGroupModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Group Name Input */}
           <div className="space-y-2">
-            <span className="text-neutral-200">
-              Group Name
-            </span>
+            <span className="text-neutral-200">Group Name</span>
             <Input
               id="groupName"
               type="text"
@@ -110,6 +114,14 @@ export default function CreateGroupModal({
                     key={user.id}
                     className="flex items-center space-x-3 p-2 hover:bg-neutral-700 rounded cursor-pointer"
                     onClick={() => handleUserToggle(user.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleUserToggle(user.id);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
                   >
                     <input
                       type="checkbox"
@@ -140,7 +152,9 @@ export default function CreateGroupModal({
             </Button>
             <Button
               type="submit"
-              disabled={!groupName.trim() || selectedUsers.length === 0 || isLoading}
+              disabled={
+                !groupName.trim() || selectedUsers.length === 0 || isLoading
+              }
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               {isLoading ? "Creating..." : "Create Group"}

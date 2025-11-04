@@ -81,7 +81,6 @@ export default function Chat() {
     });
 
   const { mutateAsync: initiateConversation } = useInitiateConversation();
-  // const { mutateAsync: sendMessage } = useSendMessage();
 
   // Add hooks for pending conversations
   const { data: pendingConversations, isLoading: isLoadingPending } =
@@ -128,7 +127,7 @@ export default function Chat() {
                   minute: "2-digit",
                 }
               ),
-              isMine: +msg.senderId === currentUser?.id ? true : false,
+              isMine: +msg.senderId === currentUser?.id,
               isAuthentic:
                 +msg.senderId === currentUser?.id ? undefined : isAuthentic,
             };
@@ -237,6 +236,12 @@ export default function Chat() {
       const baseDelay = 1000; // 1 second
       let reconnectTimeout: NodeJS.Timeout;
 
+      // Extract reconnect handler to reduce nesting
+      const handleWebSocketReconnect = () => {
+        retryCount++;
+        connectWebSocket();
+      };
+
       const connectWebSocket = () => {
         const ws = new WebSocket(wsUrl);
 
@@ -268,11 +273,7 @@ export default function Chat() {
             console.log(
               `🔄 Retrying in ${delay}ms (${retryCount + 1}/${maxRetries})`
             );
-
-            reconnectTimeout = setTimeout(() => {
-              retryCount++;
-              connectWebSocket();
-            }, delay);
+            reconnectTimeout = setTimeout(handleWebSocketReconnect, delay);
           } else if (retryCount >= maxRetries) {
             console.error("❌ Max WebSocket retry attempts reached");
           }
@@ -327,7 +328,7 @@ export default function Chat() {
       const ivArray = new Uint8Array(iv);
       const ciphertextArray = new Uint8Array(ciphertext);
 
-      const decrypted = await window.crypto.subtle.decrypt(
+      const decrypted = await globalThis.crypto.subtle.decrypt(
         { name: "AES-GCM", iv: ivArray },
         sharedKey,
         ciphertextArray
@@ -338,7 +339,7 @@ export default function Chat() {
       const { convSignPub, convSignPriv, convSymKey } = keyMessage;
 
       // 6. Generate our own signing key pair for this conversation
-      const mySignKeyPair = await window.crypto.subtle.generateKey(
+      const mySignKeyPair = await globalThis.crypto.subtle.generateKey(
         { name: "ECDSA", namedCurve: "P-256" },
         true,
         ["sign", "verify"]
@@ -358,7 +359,7 @@ export default function Chat() {
 
       const symKeyBytes = new Uint8Array(symKeyArray);
 
-      const importedSymKey = await window.crypto.subtle.importKey(
+      const importedSymKey = await globalThis.crypto.subtle.importKey(
         "raw",
         symKeyBytes,
         { name: "AES-GCM", length: 256 },
@@ -366,7 +367,7 @@ export default function Chat() {
         ["encrypt", "decrypt"]
       );
 
-      const importedSignPubKey = await window.crypto.subtle.importKey(
+      const importedSignPubKey = await globalThis.crypto.subtle.importKey(
         "jwk",
         convSignPub,
         { name: "ECDSA", namedCurve: "P-256" },
@@ -374,12 +375,12 @@ export default function Chat() {
         ["verify"] // Public key can only be used for verification
       );
 
-      const exportedSignPub = await window.crypto.subtle.exportKey(
+      const exportedSignPub = await globalThis.crypto.subtle.exportKey(
         "jwk",
         importedSignPubKey
       );
 
-      const importedSignPrivKey = await window.crypto.subtle.importKey(
+      const importedSignPrivKey = await globalThis.crypto.subtle.importKey(
         "jwk",
         convSignPriv,
         { name: "ECDSA", namedCurve: "P-256" },
@@ -388,7 +389,7 @@ export default function Chat() {
       );
 
       // 8. Export our public signing key to send back
-      const mySignPubKey = await window.crypto.subtle.exportKey(
+      const mySignPubKey = await globalThis.crypto.subtle.exportKey(
         "jwk",
         mySignKeyPair.publicKey
       );
@@ -447,31 +448,31 @@ export default function Chat() {
 
       // Step 2: Generate conversation-specific keys
       // - Symmetric key for message encryption
-      const convSymKey = await window.crypto.subtle.generateKey(
+      const convSymKey = await globalThis.crypto.subtle.generateKey(
         { name: "AES-GCM", length: 256 },
         true,
         ["encrypt", "decrypt"]
       );
 
       // - Asymmetric key pair for message signing
-      const convSignKeyPair = await window.crypto.subtle.generateKey(
+      const convSignKeyPair = await globalThis.crypto.subtle.generateKey(
         { name: "ECDSA", namedCurve: "P-256" },
         true,
         ["sign", "verify"]
       );
 
       // Step 3: Export the public signing key to send to the recipient
-      const exportedSignPub = await window.crypto.subtle.exportKey(
+      const exportedSignPub = await globalThis.crypto.subtle.exportKey(
         "jwk",
         convSignKeyPair.publicKey
       );
 
-      const exportedSignPriv = await window.crypto.subtle.exportKey(
+      const exportedSignPriv = await globalThis.crypto.subtle.exportKey(
         "jwk",
         convSignKeyPair.privateKey
       );
 
-      const exportedSymKey = await window.crypto.subtle.exportKey(
+      const exportedSymKey = await globalThis.crypto.subtle.exportKey(
         "raw",
         convSymKey
       );
@@ -488,8 +489,8 @@ export default function Chat() {
 
       // Step 5: Encrypt the key message with the shared secret from X3DH
       const encoded = new TextEncoder().encode(JSON.stringify(keyMessage));
-      const iv = window.crypto.getRandomValues(new Uint8Array(12));
-      const encrypted = await window.crypto.subtle.encrypt(
+      const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+      const encrypted = await globalThis.crypto.subtle.encrypt(
         { name: "AES-GCM", iv },
         sharedKey,
         encoded
@@ -581,10 +582,7 @@ export default function Chat() {
 
   // Helper to process received messages
   const processReceivedMessage = async (message: any) => {
-    if (
-      !conversationKeysRef.current ||
-      !conversationKeysRef.current.theirSignPubKey
-    ) {
+    if (!conversationKeysRef.current?.theirSignPubKey) {
       console.error("❌ Missing conversation keys");
       return;
     }
@@ -614,7 +612,7 @@ export default function Chat() {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        isMine: +message.senderId === currentUser?.id ? true : false,
+        isMine: +message.senderId === currentUser?.id,
         isAuthentic:
           +message.senderId === currentUser?.id ? undefined : isAuthentic,
       };
@@ -650,9 +648,9 @@ export default function Chat() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {chatMessages.map((msg, index) => (
+        {chatMessages.map((msg) => (
           <div
-            key={index}
+            key={msg.id}
             className={`flex relative ${
               msg.isMine ? "justify-end" : "justify-start"
             }`}

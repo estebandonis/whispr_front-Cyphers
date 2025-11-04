@@ -41,64 +41,34 @@ export default function ChatLayout() {
     setCreateGroupModal(true); // Open the modal instead of empty function
   };
 
-  // const groupChats = [
-  //   {
-  //     id: 1,
-  //     name: "Project Alpha",
-  //     lastMessage: "Alex: I've updated the designs",
-  //     avatar: "/groups/alpha.jpg",
-  //     time: "3:45 PM",
-  //     unread: 7,
-  //     members: 5,
-  //   },
-  //   {
-  //     id: 2,
-  //     name: "Design Team",
-  //     lastMessage: "Sarah: Check out this new tool",
-  //     avatar: "/groups/design.jpg",
-  //     time: "11:30 AM",
-  //     unread: 0,
-  //     members: 8,
-  //   },
-  //   {
-  //     id: 3,
-  //     name: "Weekend Plans",
-  //     lastMessage: "Emily: Who's free on Saturday?",
-  //     avatar: "/groups/weekend.jpg",
-  //     time: "Yesterday",
-  //     unread: 2,
-  //     members: 4,
-  //   },
-  // ];
-
   const handleCreateGroupChat = async (name: string, userIds: number[]) => {
     const members = [];
 
-    const convSymKey = await window.crypto.subtle.generateKey(
+    const convSymKey = await globalThis.crypto.subtle.generateKey(
       { name: "AES-GCM", length: 256 },
       true,
       ["encrypt", "decrypt"]
     );
 
     // - Asymmetric key pair for message signing
-    const convSignKeyPair = await window.crypto.subtle.generateKey(
+    const convSignKeyPair = await globalThis.crypto.subtle.generateKey(
       { name: "ECDSA", namedCurve: "P-256" },
       true,
       ["sign", "verify"]
     );
 
     // Step 3: Export the public signing key to send to the recipient
-    const exportedSignPub = await window.crypto.subtle.exportKey(
+    const exportedSignPub = await globalThis.crypto.subtle.exportKey(
       "jwk",
       convSignKeyPair.publicKey
     );
 
-    const exportedSignPriv = await window.crypto.subtle.exportKey(
+    const exportedSignPriv = await globalThis.crypto.subtle.exportKey(
       "jwk",
       convSignKeyPair.privateKey
     );
 
-    const exportedSymKey = await window.crypto.subtle.exportKey(
+    const exportedSymKey = await globalThis.crypto.subtle.exportKey(
       "raw",
       convSymKey
     );
@@ -139,8 +109,8 @@ export default function ChatLayout() {
 
       // Step 5: Encrypt the key message with the shared secret from X3DH
       const encoded = new TextEncoder().encode(JSON.stringify(keyMessage));
-      const iv = window.crypto.getRandomValues(new Uint8Array(12));
-      const encrypted = await window.crypto.subtle.encrypt(
+      const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+      const encrypted = await globalThis.crypto.subtle.encrypt(
         { name: "AES-GCM", iv },
         sharedKey,
         encoded
@@ -187,7 +157,7 @@ export default function ChatLayout() {
       queryClient.clear();
 
       // Redirect to the login page
-      window.location.href = "/";
+      globalThis.location.href = "/";
     }
   };
 
@@ -254,9 +224,9 @@ export default function ChatLayout() {
             <div className="flex flex-col ">
               {groupChats &&
                 groupChats.length > 0 &&
-                groupChats.map((group: any, index: number) => (
+                groupChats.map((group: any) => (
                   <NavLink
-                    key={index}
+                    key={group.id}
                     to={`/chat/${group.id}/${"true"}`}
                     className={({ isActive }) =>
                       cn(

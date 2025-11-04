@@ -25,20 +25,17 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/" element={<LoginPage />} />
             <Route path="/sign-up" element={<SignUpPage />} />
             <Route path="/oauth-callback" element={<OAuth />} />
-            <Route
-              path="/mfa"
-              children={[
-                <Route path="/mfa/verify" element={<MfaVerify />} />,
-                <Route
-                  path="/mfa/setup"
-                  element={
-                    <ProtectedRoute>
-                      <MfaSetup />
-                    </ProtectedRoute>
-                  }
-                />,
-              ]}
-            />
+            <Route path="/mfa">
+              <Route path="/mfa/verify" element={<MfaVerify />} />
+              <Route
+                path="/mfa/setup"
+                element={
+                  <ProtectedRoute>
+                    <MfaSetup />
+                  </ProtectedRoute>
+                }
+              />
+            </Route>
             <Route
               path="/chat"
               element={

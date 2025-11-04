@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils";
 
-export default function CornerAccents({ className }: { className?: string }) {
+export default function CornerAccents({
+  className,
+}: Readonly<{ className?: string }>) {
   return (
     <>
       <div
